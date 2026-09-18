@@ -1,15 +1,10 @@
-package chaumworkmanagementbackend
+package main
 
 import (
-	"github.com/gin-gonic/gin"
+	"chrisfoong/chaum-work-management-backend/routes"
 )
 
 func main() {
-	router := gin.Default()
-  	router.GET("/ping", func(c *gin.Context) {
-    c.JSON(200, gin.H{
-      "message": "Thirdty",
-    })
-  })
-  router.Run() // listens on 0.0.0.0:8080 by default
+	r := routes.SetupRouter()
+	r.Run() // listens on 0.0.0.0:8080 by default
 }
