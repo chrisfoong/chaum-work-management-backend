@@ -20,3 +20,10 @@ func TestNoopNeverReportsSent(t *testing.T) {
 		t.Fatalf("messages = %+v", got)
 	}
 }
+
+func TestDisabledNeverReportsSent(t *testing.T) {
+	status, err := Disabled{}.Send(context.Background(), Message{LineUserID: "U1", Text: "x"})
+	if err != nil || status != StatusSkipped {
+		t.Fatalf("status = %q, err = %v", status, err)
+	}
+}

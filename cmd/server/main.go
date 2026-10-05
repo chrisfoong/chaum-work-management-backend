@@ -13,8 +13,10 @@ import (
 
 	"chrisfoong/chaum-work-management-backend/internal/auth"
 	"chrisfoong/chaum-work-management-backend/internal/config"
+	"chrisfoong/chaum-work-management-backend/internal/contract"
 	"chrisfoong/chaum-work-management-backend/internal/db"
 	"chrisfoong/chaum-work-management-backend/internal/httpx"
+	"chrisfoong/chaum-work-management-backend/internal/notify"
 	"chrisfoong/chaum-work-management-backend/internal/server"
 )
 
@@ -53,6 +55,13 @@ func run() error {
 		WebAuth:    auth.Authenticate(supabase, users.ByUserID, auth.RoleSupervisor, auth.RoleAssistant),
 		WorkerAuth: auth.Authenticate(auth.NewLineVerifier(cfg.LineChannelID), users.ByLineID, auth.RoleWorker),
 	})
+
+	// The real LINE notifier comes in P11; until then every message is logged as skipped.
+	notifier := notify.Disabled{}
+	slog.Warn("LINE notifier not configured: notifications are skipped, not delivered")
+
+	contractSvc := contract.NewService(contract.TORRepository{}, pool, db.PoolTx(pool), notifier)
+	contract.RegisterRoutes(router.Web, contract.NewHandler(contractSvc))
 
 	srv := &http.Server{
 		Addr:              ":" + cfg.Port,

@@ -1,58 +1,65 @@
 -- 0001_init: the 16 entities of the production ER (docs/02_domain_model.md).
 -- NOT APPLIED. Review before running against any database.
 --
--- Conventions: UUID keys (gen_random_uuid, built into PostgreSQL 13+), money as
--- NUMERIC, timestamps as timestamptz (UTC). user_id = worker_id (docs/04 §1.1).
--- Choices taken on open decisions are marked with D#; see docs/04 §2.
+-- Names, types and constraints follow docs/references/datadict.txt; deliberate
+-- deviations are marked "Deviation". Conventions: UUID keys (gen_random_uuid, built
+-- into PostgreSQL 13+), money as NUMERIC, timestamps as timestamptz (UTC).
+-- user_id = worker_id (docs/04 §1.1). Status/role sets are text + CHECK, not ENUM
+-- (Deviation: same values, easier to change).
 
 -- USER. "user" is reserved in PostgreSQL, so the table is "users".
 -- Web users (supervisor, assistant): user_id is set to their Supabase Auth user id (D13).
--- Workers: line_id holds the LINE user id used to resolve LIFF logins.
+-- line_id holds the LINE userId (the `sub` from ID-token verification), not the public LINE ID.
+-- Deviation: role 'assistant' instead of the datadict's 'asst_supervisor' (user decision).
 CREATE TABLE users (
     user_id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    first_name      text NOT NULL,
-    last_name       text NOT NULL,
-    phone_number    text,
-    role            text NOT NULL CHECK (role IN ('supervisor', 'assistant', 'worker')),
-    line_id         text UNIQUE,
-    daily_wage      numeric(12, 2) CHECK (daily_wage >= 0),
-    bank_name       text,
-    bank_account_no text,
+    first_name      varchar(100) NOT NULL,
+    last_name       varchar(100) NOT NULL,
+    phone_number    varchar(10) NOT NULL UNIQUE,
+    role            text NOT NULL DEFAULT 'worker' CHECK (role IN ('supervisor', 'assistant', 'worker')),
+    line_id         varchar(50) NOT NULL UNIQUE,
+    daily_wage      numeric(10, 2) DEFAULT 400.00 CHECK (daily_wage >= 0),
+    bank_name       varchar(100) NOT NULL,
+    bank_account_no varchar(50) NOT NULL,
     is_active       boolean NOT NULL DEFAULT true,
     created_at      timestamptz NOT NULL DEFAULT now(),
     updated_at      timestamptz NOT NULL DEFAULT now()
 );
 
--- WORKER: shares USER's identity (user_id = worker_id); only worker-specific data.
+-- WORKER: shares USER's identity (worker_id = user_id); only worker-specific data.
 CREATE TABLE worker (
-    user_id      uuid PRIMARY KEY REFERENCES users (user_id),
+    worker_id    uuid PRIMARY KEY REFERENCES users (user_id),
     is_available boolean NOT NULL DEFAULT true
 );
 
--- CONTRACT_TOR. user_id = USER MANAGES (R02). status value set is not specified.
+-- CONTRACT_TOR. user_id = USER MANAGES (R02). 1S inserts status 'registered'.
+-- Deviation: named unique constraint so 1S can map a duplicate to 409 (C-P4-3).
 CREATE TABLE contract_tor (
     tor_id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id           uuid NOT NULL REFERENCES users (user_id),
-    project_name      text NOT NULL,
-    contract_no       text NOT NULL UNIQUE,
-    partner_agency    text,
-    contract_value    numeric(14, 2) CHECK (contract_value >= 0),
-    start_date        date,
-    end_date          date,
-    contract_file_url text,
-    status            text,
+    project_name      varchar(255) NOT NULL,
+    contract_no       varchar(100) NOT NULL,
+    partner_agency    varchar(255) NOT NULL,
+    contract_value    numeric(14, 2) NOT NULL CHECK (contract_value >= 0),
+    start_date        date NOT NULL,
+    end_date          date NOT NULL,
+    contract_file_url varchar(255),
+    status            text NOT NULL DEFAULT 'registered' CHECK (status IN ('registered', 'active', 'complete', 'cancelled')),
     created_at        timestamptz NOT NULL DEFAULT now(),
     updated_at        timestamptz NOT NULL DEFAULT now(),
-    CHECK (end_date IS NULL OR start_date IS NULL OR end_date >= start_date)
+    CONSTRAINT uq_contract_tor_contract_no UNIQUE (contract_no),
+    CHECK (end_date >= start_date)
 );
 
--- LOCATION. 1S rejects a duplicate location name.
+-- LOCATION.
+-- Deviation: UNIQUE location_name (not in datadict) — 1S rejects a duplicate name (Q1S.2.1).
 CREATE TABLE location (
     location_id   uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    location_name text NOT NULL UNIQUE,
+    location_name varchar(255) NOT NULL,
     address       text,
-    latitude      numeric(9, 6),
-    longitude     numeric(9, 6)
+    latitude      numeric(10, 7),
+    longitude     numeric(10, 7),
+    CONSTRAINT uq_location_location_name UNIQUE (location_name)
 );
 
 -- TOR_LOCATION_ASSIGNMENT: contract + location pairing (R07 INCLUDES, R08 HOSTS).
@@ -60,7 +67,7 @@ CREATE TABLE tor_location_assignment (
     assignment_id    uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     tor_id           uuid NOT NULL REFERENCES contract_tor (tor_id),
     location_id      uuid NOT NULL REFERENCES location (location_id),
-    required_workers integer NOT NULL CHECK (required_workers >= 0)
+    required_workers integer NOT NULL DEFAULT 0 CHECK (required_workers >= 0)
 );
 
 -- WORK_SCHEDULE: one worker, one date, one assignment (R10, R15).
@@ -68,44 +75,43 @@ CREATE TABLE tor_location_assignment (
 CREATE TABLE work_schedule (
     schedule_id      uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     assignment_id    uuid NOT NULL REFERENCES tor_location_assignment (assignment_id),
-    worker_id        uuid NOT NULL REFERENCES worker (user_id),
+    worker_id        uuid NOT NULL REFERENCES worker (worker_id),
     work_date        date NOT NULL,
     shift_start_time time NOT NULL,
-    shift_status     text,
+    shift_status     text NOT NULL DEFAULT 'scheduled' CHECK (shift_status IN ('scheduled', 'completed', 'cancelled')),
     UNIQUE (worker_id, work_date)
 );
 
 -- ATTENDANCE (R16 RECORDS, R17 LOGS, R18 REPLACES).
--- D11: unique/UPSERT key is (schedule_id, worker_id).
--- D11: replacement_worker_id is set only when the replacement worker accepts;
---      the exact population flow is decided in the attendance slice (P7).
+-- D11: one attendance per schedule. UNIQUE (schedule_id, worker_id) is kept only as the
+-- ON CONFLICT target for 3W Q3W.3. substitute_worker_id is unused: a replacement gets
+-- its own work_schedule row (4A Q4A.7).
 -- status is NULL until the 4S daily job classifies the row.
 CREATE TABLE attendance (
-    attendance_id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    schedule_id           uuid NOT NULL REFERENCES work_schedule (schedule_id),
-    worker_id             uuid NOT NULL REFERENCES worker (user_id),
-    replacement_worker_id uuid REFERENCES worker (user_id),
-    work_date             date NOT NULL,
-    check_in              timestamptz,
-    check_out             timestamptz,
-    status                text CHECK (status IN ('on_time', 'late', 'leave', 'absent')),
+    attendance_id        uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    schedule_id          uuid NOT NULL UNIQUE REFERENCES work_schedule (schedule_id),
+    worker_id            uuid NOT NULL REFERENCES worker (worker_id),
+    substitute_worker_id uuid REFERENCES worker (worker_id),
+    work_date            date NOT NULL,
+    check_in             timestamptz,
+    check_out            timestamptz,
+    status               text CHECK (status IN ('on_time', 'late', 'leave', 'absent')),
     UNIQUE (schedule_id, worker_id),
     CHECK (check_out IS NULL OR check_in IS NULL OR check_out >= check_in)
 );
 
 -- LEAVE_REQUEST (R19 SUBMITS).
--- D14: keyed by user_id for now; switching to schedule_id is to be discussed.
--- The 2W duplicate-leave check is enforced in the service, not here (whether a
--- rejected leave may be re-submitted is not specified).
+-- D14: keyed by user_id; no re-submission for the same date, whatever the earlier status (2W Q2W.2).
 CREATE TABLE leave_request (
     request_id        uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id           uuid NOT NULL REFERENCES worker (user_id),
-    leave_no          text NOT NULL UNIQUE,
+    user_id           uuid NOT NULL REFERENCES users (user_id),
+    leave_no          varchar(50) NOT NULL UNIQUE,
     leave_date        date NOT NULL,
     reason            text NOT NULL,
-    is_advance_notice boolean NOT NULL,
+    is_advance_notice boolean NOT NULL DEFAULT false,
     status            text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
-    created_at        timestamptz NOT NULL DEFAULT now()
+    created_at        timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (user_id, leave_date)
 );
 
 -- WORK_EVIDENCE (R11 COLLECTS, R20 CAPTURES).
@@ -113,25 +119,26 @@ CREATE TABLE leave_request (
 CREATE TABLE work_evidence (
     evidence_id   uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     assignment_id uuid NOT NULL REFERENCES tor_location_assignment (assignment_id),
-    worker_id     uuid NOT NULL REFERENCES worker (user_id),
-    photo_url     text NOT NULL,
+    worker_id     uuid NOT NULL REFERENCES worker (worker_id),
+    photo_url     varchar(255) NOT NULL,
     description   text,
     submitted_at  timestamptz NOT NULL DEFAULT now()
 );
 
--- PAYROLL (R01 RECEIVES via worker_id).
--- D1: no payer column (USER PAYS PAYROLL not stored).
+-- PAYROLL (R01 RECEIVES via user_id; R24 PAYS via managed_by_id).
+-- D1: managed_by_id is set by 5S from the logged-in supervisor.
 -- net_wage = base_wage - total_deduction, stored as written by 5S.
 -- D8 (re-run guard) is open: no unique key added.
 CREATE TABLE payroll (
     payroll_id      uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    worker_id       uuid NOT NULL REFERENCES worker (user_id),
-    payroll_slip_no text UNIQUE,
+    user_id         uuid NOT NULL REFERENCES users (user_id),
+    managed_by_id   uuid NOT NULL REFERENCES users (user_id),
+    payroll_slip_no varchar(50) NOT NULL UNIQUE,
     period_start    date NOT NULL,
     period_end      date NOT NULL,
-    base_wage       numeric(12, 2) NOT NULL,
-    total_deduction numeric(12, 2) NOT NULL DEFAULT 0,
-    net_wage        numeric(12, 2) NOT NULL,
+    base_wage       numeric(10, 2) NOT NULL,
+    total_deduction numeric(10, 2) NOT NULL DEFAULT 0,
+    net_wage        numeric(10, 2) NOT NULL,
     is_paid         boolean NOT NULL DEFAULT false,
     created_at      timestamptz NOT NULL DEFAULT now(),
     CHECK (period_end >= period_start),
@@ -145,91 +152,102 @@ CREATE TABLE payroll (
 --     applied to a payroll (5S creates deductions before the payroll row).
 CREATE TABLE deduction_transaction (
     deduction_id   uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    worker_id      uuid NOT NULL REFERENCES worker (user_id),
-    attendance_id  uuid NOT NULL REFERENCES attendance (attendance_id),
+    worker_id      uuid NOT NULL REFERENCES worker (worker_id),
+    attendance_id  uuid REFERENCES attendance (attendance_id),
     payroll_id     uuid REFERENCES payroll (payroll_id),
-    penalty_amount numeric(12, 2) NOT NULL CHECK (penalty_amount >= 0),
+    penalty_amount numeric(10, 2) NOT NULL CHECK (penalty_amount >= 0),
     reason         text NOT NULL,
     created_at     timestamptz NOT NULL DEFAULT now()
 );
 
--- EQUIPMENT: master data; 1S finds or creates equipment by name.
+-- EQUIPMENT: master data.
+-- Deviation: UNIQUE equipment_name (not in datadict) — 1S finds or creates equipment by
+-- name (Q1S.6) and needs exactly one row per name.
 CREATE TABLE equipment (
     equipment_id   uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    equipment_name text NOT NULL UNIQUE,
-    is_active      boolean NOT NULL DEFAULT true
+    equipment_name varchar(255) NOT NULL,
+    is_active      boolean NOT NULL DEFAULT true,
+    CONSTRAINT uq_equipment_equipment_name UNIQUE (equipment_name)
 );
 
--- EQUIPMENT_REQUISITION (R03 REQUESTS via user_id, R04 REVIEWS via reviewed_by, R09 REQUIRES).
+-- EQUIPMENT_REQUISITION (R03 REQUESTS via requested_by, R04 REVIEWS via reviewed_by, R09 REQUIRES).
+-- Deviation: status set per user decision (datadict lists pending_fund/pending_approval/cancelled).
+-- Deviation: reject_reason is not in datadict; kept until the team confirms.
 CREATE TABLE equipment_requisition (
     requisition_id   uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    requisition_no   text NOT NULL UNIQUE,
+    requisition_no   varchar(50) NOT NULL,
     assignment_id    uuid NOT NULL REFERENCES tor_location_assignment (assignment_id),
-    user_id          uuid NOT NULL REFERENCES users (user_id),
+    requested_by     uuid NOT NULL REFERENCES users (user_id),
     requisition_type text NOT NULL CHECK (requisition_type IN ('tor_base', 'additional')),
-    status           text NOT NULL CHECK (status IN (
+    status           text NOT NULL DEFAULT 'pending_survey' CHECK (status IN (
                          'pending_survey', 'pending_supervisor', 'pending_procurement',
                          'approved', 'completed', 'rejected')),
-    reason           text,
+    reason           text NOT NULL,
     reject_reason    text,
     created_at       timestamptz NOT NULL DEFAULT now(),
     reviewed_by      uuid REFERENCES users (user_id),
-    reviewed_at      timestamptz
+    reviewed_at      timestamptz,
+    CONSTRAINT uq_equipment_requisition_requisition_no UNIQUE (requisition_no)
 );
 
 -- REQUISITION_ITEM (R12 CONTAINS, R13 IS_LISTED_IN). actual_qty is cumulative (2A, 7A).
+-- actual_price is the unit price.
+-- Deviation: actual_qty NOT NULL DEFAULT 0 (cumulative arithmetic); to_buy_qty is a plain
+-- column written by 1A/5W, not a generated column.
 CREATE TABLE requisition_item (
     item_id        uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     requisition_id uuid NOT NULL REFERENCES equipment_requisition (requisition_id),
     equipment_id   uuid NOT NULL REFERENCES equipment (equipment_id),
-    required_qty   integer NOT NULL CHECK (required_qty >= 0),
+    required_qty   integer NOT NULL DEFAULT 1 CHECK (required_qty >= 0),
     existing_qty   integer CHECK (existing_qty >= 0),
     to_buy_qty     integer CHECK (to_buy_qty >= 0),
     actual_qty     integer NOT NULL DEFAULT 0 CHECK (actual_qty >= 0),
-    actual_price   numeric(12, 2) CHECK (actual_price >= 0),
+    actual_price   numeric(10, 2) CHECK (actual_price >= 0),
     remark         text
 );
 
 -- EXPENSE_CLAIM (R05 CLAIMS via user_id, R14 GENERATES via requisition_id; many per requisition).
--- Only 'actual_expense' counts as material cost. transfer_ref_no is unique when present (2S).
+-- Only 'actual_expense' counts as material cost. expense_no is always set;
+-- transfer_ref_no is required for fund_transfer only (Deviation: datadict says NOT NULL).
+-- Deviation: requisition_id and user_id NOT NULL (every insert sets them).
 CREATE TABLE expense_claim (
     expense_id        uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     requisition_id    uuid NOT NULL REFERENCES equipment_requisition (requisition_id),
     user_id           uuid NOT NULL REFERENCES users (user_id),
-    expense_no        text UNIQUE,
+    expense_no        varchar(50) NOT NULL UNIQUE,
     expense_type      text NOT NULL CHECK (expense_type IN ('fund_transfer', 'actual_expense')),
-    total_amount      numeric(14, 2) NOT NULL CHECK (total_amount >= 0),
-    receipt_photo_url text,
-    transfer_ref_no   text UNIQUE,
+    total_amount      numeric(10, 2) NOT NULL CHECK (total_amount > 0),
+    receipt_photo_url varchar(255) NOT NULL,
+    transfer_ref_no   varchar(100) UNIQUE,
     created_at        timestamptz NOT NULL DEFAULT now(),
     -- 2S: a fund transfer requires its transfer reference.
     CHECK (expense_type <> 'fund_transfer' OR transfer_ref_no IS NOT NULL)
 );
 
 -- COMPANY_INVOICE (R06 BILLS). exat_deduction_amount keeps the ER spelling.
--- billing_month stores the first day of the month. status value set is not specified.
+-- billing_month is 'YYYY-MM'.
 CREATE TABLE company_invoice (
     invoice_id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     tor_id                uuid NOT NULL REFERENCES contract_tor (tor_id),
-    invoice_no            text NOT NULL UNIQUE,
-    billing_month         date NOT NULL CHECK (EXTRACT(DAY FROM billing_month) = 1),
-    expected_amount       numeric(14, 2),
-    net_received          numeric(14, 2),
-    exat_deduction_amount numeric(14, 2),
+    invoice_no            varchar(50) NOT NULL UNIQUE,
+    billing_month         varchar(7) NOT NULL CHECK (billing_month ~ '^[0-9]{4}-(0[1-9]|1[0-2])$'),
+    expected_amount       numeric(12, 2) NOT NULL,
+    net_received          numeric(12, 2),
+    exat_deduction_amount numeric(12, 2) DEFAULT 0.00,
     deduction_reason      text,
-    status                text
+    status                text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'paid'))
 );
 
 -- Indexes on foreign keys used by SD queries (docs/03). Lookups already covered by a
 -- primary key or UNIQUE constraint are not repeated:
 --   work_schedule (worker_id, work_date): 1W, 2W, 3W, 3A, 5W
---   attendance (schedule_id, worker_id): 3W, 4S findCheckIn
+--   attendance (schedule_id) / (schedule_id, worker_id): 3W, 4S
+--   leave_request (user_id, leave_date): 2W checkDuplicateLeave; 4S countApprovedAdvanceLeave
 CREATE INDEX idx_tor_location_assignment_tor_id ON tor_location_assignment (tor_id);       -- 3A findTORAssignments(torId); 6S per-project totals
 CREATE INDEX idx_work_schedule_assignment_id ON work_schedule (assignment_id);             -- 4A findPendingLeaveRequests/checkAffectedSchedule(assignmentId); 8A checkScheduleRecipientAndArea
 CREATE INDEX idx_work_schedule_work_date ON work_schedule (work_date);                     -- 4S findScheduledWorkers(work_date); 4A findReplacementCandidates(leave_date)
 CREATE INDEX idx_attendance_worker_id_work_date ON attendance (worker_id, work_date);      -- 4W findTodayOpenAttendance(userId)
-CREATE INDEX idx_leave_request_user_id_leave_date ON leave_request (user_id, leave_date);  -- 2W checkDuplicateLeave; 4S countApprovedAdvanceLeave
-CREATE INDEX idx_payroll_worker_id_period_start ON payroll (worker_id, period_start);      -- 7W findPayslipsByMonth(userId, period_month)
+CREATE INDEX idx_payroll_user_id_period_start ON payroll (user_id, period_start);          -- 7W findPayslipsByMonth(userId, period_month)
 CREATE INDEX idx_deduction_transaction_worker_id ON deduction_transaction (worker_id);     -- 5S findDeductionItems/getTotalDeduction; 7W findDeductionDetails
 CREATE INDEX idx_equipment_requisition_assignment_id ON equipment_requisition (assignment_id); -- 5A/7A/8A find*Requests(assignmentId); 6S material via assignment
 CREATE INDEX idx_equipment_requisition_status ON equipment_requisition (status);           -- 1A/2S/2A/3S list requisitions by status
