@@ -48,3 +48,11 @@ func (n *Noop) Messages() []Message {
 	defer n.mu.Unlock()
 	return append([]Message(nil), n.messages...)
 }
+
+// Disabled is the NON-DELIVERING notifier the server uses until the real LINE
+// notifier exists (P11). Unlike Noop it keeps nothing in memory. It always
+// returns StatusSkipped; it never reports a message as sent.
+type Disabled struct{}
+
+// Send reports msg as skipped.
+func (Disabled) Send(context.Context, Message) (Status, error) { return StatusSkipped, nil }

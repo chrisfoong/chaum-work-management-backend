@@ -40,6 +40,12 @@ func (e *Error) Error() string {
 
 func (e *Error) Unwrap() error { return e.Err }
 
+// WithFields attaches failing fields to e and returns it.
+func (e *Error) WithFields(fields ...FieldError) *Error {
+	e.Fields = append(e.Fields, fields...)
+	return e
+}
+
 // Validation reports invalid input, naming each failing field.
 func Validation(fields ...FieldError) *Error {
 	return &Error{Kind: KindValidation, Code: "validation_failed", Message: "request validation failed", Fields: fields}
