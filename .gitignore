@@ -31,8 +31,6 @@ go.work.sum
 # .idea/
 # .vscode/
 
-CLAUDE.md
-
 # macOS
 .DS_Store
 docs/references/

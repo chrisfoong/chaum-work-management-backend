@@ -6,6 +6,25 @@ Generated from the class/SD mapping of the historical class package. For each se
 
 Role legend: Boundary = UI, Control = controller, Repository = data access, Service = infrastructure/job.
 
+## Current class diagrams (2026-10-05)
+`docs/references/Chaum-Diagrams-PlantUML.txt` overrides this file for operation names, parameter names,
+call order and who calls whom. Differences from the inventory below:
+- 3S: ReviewRequisitionController calls LINENotificationService directly; no BackgroundJob; no 3.1S diagram.
+- 9A: checkAreaAccessPermission(assignmentId) is on ContractRepository (SQL); one call loadContractAndArea
+  performs validation, permission, lookup and evaluation.
+- 1S: new WebUI.submitContractForm(contractNo, projectName, partnerAgency, startDate, endDate, contractValue, contractFile).
+- 5A: UI selectRequisition() replaces selectExistingRequest. 6A: new UI openOriginalRequest().
+- 6W: new EquipmentResultController.loadEquipmentRequestResult(requisitionId) / receiveEquipmentResult(requisitionId).
+- Named parameters: selectRequisitionStatus(status), updateRequisitionStatus(requisitionId, status),
+  updateAttendanceStatus(attendanceId, status), updateLeaveStatus(requestId, status), notifySupervisor(message),
+  notifySupervisorOfShortage(requisition_no, nextStep).
+- Open conflict with docs/04 §1.3: the diagrams still use calculateNetPay, createDeduction(workerId, penaltyAmount,
+  penaltyReason), createPayroll(…, netPay), showDigitalPayslipCard(…, total_wage, …). Do not choose; ask.
+
+### Additions not in the use cases or class diagrams (team to confirm)
+- 1S: GET /api/web/locations?q= — location search for the step-6 picker (supervisor only, ≤20 matches by name).
+  Added by user decision 2026-10-05.
+
 
 ## SD-1S — Create TOR contract and work scope
 

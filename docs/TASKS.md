@@ -16,7 +16,7 @@ You may edit this file without a separate plan (it is bookkeeping), but show the
 - Schema: designed from docs/02 in migrations/0001_init.*.sql — **NOT applied, not syntax-checked against PostgreSQL**
 - Uncommitted changes present: yes (tracked main.go/routes/handlers deleted; go.mod/go.sum/.gitignore modified; cmd/, internal/, migrations/, .env.example, docs/, README.md untracked)
 - Build / vet / test: 2026-10-05, go1.26.0 — build exit 0, vet exit 0, `go test -count=1 ./...` all 9 packages ok; gofmt clean
-- Next action: user decides M1 (D8), M2 (R16/D11 replacement), M3 (leave re-submit), L5, L7, L8, requisition `rejected`; optional syntax check on a disposable local DB; discuss D14; then Prompt 4 (1S, 1A, 9A)
+- Next action: **1S built — stopped for user review** (P4 runs 1S → 1A → 9A with a stop after each). Database option (B): no database; P4 SQL **unverified**; integration tests skip unless TEST_DATABASE_URL (local only) is set.
 
 ## Phases and tasks
 
@@ -40,6 +40,7 @@ No schema existed, so reconciliation was replaced by schema design (user decisio
 - [x] Review fixes round 1 (2026-10-05, approved): H1 RLS on all 16 tables (no policies), L2 net_wage CHECK (TODO(decision-10)), L3 fund_transfer needs transfer_ref_no, L1 12 FK indexes (each justified by an SD query). Verified statically: 16 tables = 16 RLS statements, every index column exists, no other lines changed. **Still not executed**
 - [x] M4, M5, L4, L6 recorded as service-layer notes (below)
 - [ ] Waiting on user: M1 (D8), M2 (R16 / replacement), M3 (duplicate leave), L5, L7, L8, requisition status `rejected`
+- [x] Migration round 2 (data dictionary alignment): approved and applied to the FILE 2026-10-05 (not to any database). Static check: 16 tables = 16 RLS statements; all REFERENCES hit a primary key; 11 indexes on existing columns; every datadict column present in all 16 tables; only extra column `reject_reason` (deliberate); named unique constraints uq_contract_tor_contract_no, uq_location_location_name, uq_equipment_equipment_name, uq_equipment_requisition_requisition_no for 409 mapping. **Not executed / not syntax-checked by PostgreSQL.** Down file unchanged (same table names). Covers role values unchanged (`assistant`, per user 2026-10-05), requisition status set, `requested_by`, payroll `user_id` + `managed_by_id`, `worker.worker_id` PK, leave → users + UNIQUE (user_id, leave_date), attendance `substitute_worker_id` + UNIQUE (schedule_id), expense_claim rules, `line_id` NOT NULL, billing_month 'YYYY-MM', status sets for contract/invoice/shift, DD types and NOT NULLs. Resolves M2, M3, L5 (billing_month), L7 (attendance_id nullable) once applied
 
 #### Service-layer notes (from P1 review; no SQL)
 - M4: create-user with role `worker` must insert the `worker` row in the same transaction; never create a `worker` row for another role.
@@ -73,7 +74,11 @@ No schema existed, so reconciliation was replaced by schema design (user decisio
 - [x] Storage interface + in-memory fake
 
 ### P4 — Contracts and survey — Prompt 4
-- [ ] 1S Create TOR + scope (single transaction, duplicate contract_no, location, assignment, initial tor_base requisition, items)
+- [~] 1S Create TOR + scope — code + unit/handler tests done 2026-10-05; **SQL unverified** (never run against PostgreSQL)
+  - Endpoints: POST /api/web/contracts/info, /contracts/scope (check only), /contracts/confirm (201), GET /api/web/locations?q= (supervisor only)
+  - Verified by tests (fake store): call order per Collaboration_1S; one tx; 23505 by constraint name → 409 (contract_no, location_name); FK 23503 → 400; requisition_no REQ-YYYYMMDD-NNN per Bangkok day with whole-tx retry (max 3) → 409 requisition_no_busy; equipment create-on-conflict-do-nothing then find; Q6 duplicate rules; field names prefixed contract./scope. on confirm; role access (401/403); notification after commit in background, own 10 s timeout, logs sent/skipped/failed, failure keeps the 201
+  - Integration tests written (5), skipped without TEST_DATABASE_URL: unique 409 names, FK 400 name, equipment upsert, numbering + unique violation
+  - Stubs: TODO(decision-file) contract file; TODO(decision-12) notification recipients = all active assistants
 - [ ] 1A Site survey (to_buy_qty, validations, status)
 - [ ] 9A Work continuation check
 
@@ -175,6 +180,23 @@ Risks (smallest fix to consider; nothing applied):
 | L7 | Low | deduction.attendance_id NOT NULL makes TRIGGERS mandatory (ER gives max cardinality only) | Confirm every deduction comes from attendance |
 | L8 | Low | payroll/schedule/leave FKs point to worker, not users, so only workers can have payroll | Matches identity decision; confirm |
 
+### Repository layout notes (2026-10-05)
+- `docs/references/` is git-ignored and exists only on the user's machine; it may be absent on a fresh clone. `docs/00`–`07` and this file are the tracked summary. If a reference file is missing: say so and ask; never guess.
+- `CLAUDE.md` is now tracked: removed from `.gitignore` (user will `git add` it). Checked first: no secrets, connection strings or tokens (only rule text mentioning them). `.env` and `docs/references/` stay ignored.
+
+### Flagged to the team (undefined screens/flows)
+- Contract list screen ("รายการสัญญา", 1S step 2): no use case, no query, no class-diagram operation.
+- Contract detail page (1S step 11): content undefined; for now the POST /contracts 201 response carries the data.
+- Location search (1S step 6): GET /api/web/locations?q= added by the user's decision; not in the use case or class diagram — team to confirm.
+
+### Class diagrams intake — 2026-10-05 (read-only)
+`docs/references/Chaum-Diagrams-PlantUML.txt`: 4,496 lines, 55 diagrams, all read in full (Chaum_1–13, Chaum_A4_Summary, Data Flow, Component, 22 Collaboration_*_Normal_Case, Class_Interactions_1–15, State). No 3.1S, no 7S, no sequence-diagram code (images only, per the file header).
+- Entities (Chaum_11–13) match datadict.txt column-for-column; they show types only (no NOT NULL/defaults). They differ from user decisions: role `assistant` (diagram `asst_supervisor`), requisition status set (diagram `pending_fund/pending_approval/cancelled`), `reject_reason` (absent in diagram).
+- Operation names match docs/03 almost entirely. Differences: 3S notifies directly (no BackgroundJob, no 3.1S); 9A `checkAreaAccessPermission` moved to ContractRepository and one call `loadContractAndArea` does load + evaluation; new `WebUI.submitContractForm(..., contractFile)`; 5A `selectRequisition()`; 6A `openOriginalRequest()`; 6W `EquipmentResultController.loadEquipmentRequestResult/receiveEquipmentResult`; several params now named (status, message, nextStep).
+- Still uses pre-correction names (conflict with docs/04 §1.3): `calculateNetPay`, `createDeduction(workerId, penaltyAmount, penaltyReason)`, `createPayroll(..., netPay)`, `showDigitalPayslipCard(..., total_wage, ...)`. Open — blocks P8, not P4.
+- State diagram covers LEAVE_REQUEST only (pending → approved/rejected; replacement schedule in the same transaction). No state diagrams for requisition, contract, attendance, payroll.
+- Proposed P4 plan changes (not applied): endpoints named after operations; confirmContract and processSiteSurvey make no extra re-check queries (rely on unique/FK constraints and a conditional UPDATE); 9A becomes one call; 1S notification after the response.
+
 ## Decisions log (user answers to D1–D14 and anything new)
 | Date | Decision | Answer | Source |
 |---|---|---|---|
@@ -188,6 +210,36 @@ Risks (smallest fix to consider; nothing applied):
 | 2026-10-05 | D13 | Supabase Auth JWT (JWKS); users.user_id = auth user id | Claude, at user's request |
 | 2026-10-05 | D14 | leave_request.user_id for now — **TO DISCUSS: user prefers schedule_id** | user |
 | 2026-10-05 | Value sets | role + attendance status lowercase, CHECK constraints | user |
+| 2026-10-05 | D1 (revised) | payroll.managed_by_id FK users NOT NULL, set by 5S from the logged-in supervisor | user |
+| 2026-10-05 | Role value | ~~'asst_supervisor'~~ → **keep 'assistant'** (user reversed; data dictionary says asst_supervisor — deliberate deviation) | user |
+| 2026-10-05 | Requisition status | pending_survey, pending_procurement, pending_supervisor, approved, rejected, completed | user |
+| 2026-10-05 | Names | requisition.requested_by; payroll.user_id; worker PK worker_id; leave_request.user_id → users | user, data dictionary |
+| 2026-10-05 | expense_claim | transfer_ref_no required only for fund_transfer; expense_no always set; receipt_photo_url NOT NULL; total_amount > 0 | user |
+| 2026-10-05 | line_id | LINE userId (sub), NOT NULL, UNIQUE | user |
+| 2026-10-05 | D14 | keep user_id; UNIQUE (user_id, leave_date); no re-submission of leave | user, uc 2W Q2W.2 |
+| 2026-10-05 | D11 (revised) | attendance UNIQUE (schedule_id) + UNIQUE (schedule_id, worker_id); substitute_worker_id nullable, unused; replacement = new work_schedule row | user, data dictionary, uc 4A Q4A.7 |
+| 2026-10-05 | reject_reason | keep, nullable, until the team confirms | user |
+| 2026-10-05 | Status sets | contract registered/active/complete/cancelled (default registered); invoice pending/paid (default pending); shift scheduled/completed/cancelled | user, data dictionary |
+| 2026-10-05 | billing_month | varchar(7) 'YYYY-MM' with format CHECK | user, data dictionary |
+| 2026-10-05 | Penalties | late <1h 300, 1–3h 400, >3h 1,500; absent 1,500 | user, uc 5S Q5S.2 |
+| 2026-10-05 | requisition_no | `REQ-YYYYMMDD-NNN`, sequence per Bangkok day, generated in the transaction, retry on unique conflict | user (Claude's recommendation) |
+| 2026-10-05 | 1S items | per area: one tor_base requisition + items per TOR_LOCATION_ASSIGNMENT (requisition has assignment_id FK) | user |
+| 2026-10-05 | 1S notification | LINE to assistants (ผู้ดูแลงาน); which assistants → all active `assistant` users with line_id until D12 | user; recipient scope TODO(decision-12) |
+| 2026-10-05 | 1A list (C15) | Q1A.0 adds `AND er.requisition_type = 'tor_base'` (5W additional requests go to 5A only) | user |
+| 2026-10-05 | 1S duplicates (Q6) | reject the same location twice in one contract and the same equipment name twice in one area | user |
+| 2026-10-05 | Q1–Q4, Q6 | accepted as recorded above; Q2 confirmed by Collaboration_1S (one initial requisition per area) | user |
+| 2026-10-05 | Role (final) | keep 'assistant'; deliberate difference from datadict + class diagram ('asst_supervisor'); record in docs/04 + frontend mapping note | user |
+| 2026-10-05 | Q5a | add GET /api/web/locations?q= (supervisor only, ≤20 matches); mark in docs/03 as an addition for team confirmation | user |
+| 2026-10-05 | Q5b | POST /contracts 201 response carries the detail-page data; GET detail only if the team specifies the page | user |
+| 2026-10-05 | Q5c | contract list screen: not built; flagged to the team as undefined (no use case, no query, no class-diagram operation) | user |
+| 2026-10-05 | D12, D16, D17, D-file | stay open; stub with TODO markers | user |
+| 2026-10-05 | Throwaway DB | not yet; no database use until the user supplies a local connection string | user |
+| 2026-10-05 | C-P4-1..8 | all accepted with notes: 9A one GET (summary null until D17); checkAreaAccessPermission(assignmentId, userId) stub; no confirm re-check queries, 23505 by constraint name → 409, FK → 400, equipment insert-on-conflict-do-nothing then select, /info and /scope keep early checks and store nothing; 1A status update last, explicit value, conditional on pending_survey; every item exactly once + belongs to requisition (deviations from diagram); background notify with own context/timeout, no outbox; contracts saved without file until D-file; route-registration test for /requisitions/pending-survey vs /:id | user |
+| 2026-10-05 | Reference intake | approved with corrections and applied to CLAUDE.md, docs/00, 02, 04, 05 | user |
+| 2026-10-05 | D1 / D1b | D1: payer = the supervisor who runs 5S manually (uc 5S steps 1–2). D1b (open): automatic 5S start from 4S (uc 4S step 6) has no payer → not built until the team decides | user |
+| 2026-10-05 | C5 | uc SQL uses w.worker_id and w.user_id (5S Q5S.1, 4A Q4A.1); datadict has only worker_id → read w.user_id as worker_id | user |
+| 2026-10-05 | Round 2 | keep the migration as is; not applied to any database | user |
+| 2026-10-05 | Docs D-1, D-2, D-3 | approved and applied (docs/04 role row + frontend notes; docs/03 class-diagram section + additions; docs/00 rows for PlantUML, datadict, uc, ER + precedence) | user |
 (Add a row whenever the user settles a D#; also update docs/04 §2.)
 
 ## Files changed but not committed (append per task)
@@ -198,6 +250,11 @@ Risks (smallest fix to consider; nothing applied):
   MODIFIED go.mod, go.sum (regenerated), .gitignore (+.DS_Store), docs/04_decisions_and_corrections.md (§2.1 decided), docs/TASKS.md.
 - 2026-10-05 Handoff: docs/handoff/ created then DELETED at user request (Claude Desktop prompts are given in chat, not as files).
 - 2026-10-05 P1 migration review: docs/TASKS.md only (read-only review; migration unchanged).
+- 2026-10-05 Docs D-1..D-3: MODIFIED docs/00_INDEX.md, docs/03_workflows_operations.md, docs/04_decisions_and_corrections.md.
+- 2026-10-05 Migration round 2: MODIFIED migrations/0001_init.up.sql (down unchanged).
+- 2026-10-05 P4/1S: ADDED internal/contract/{model,validate,repository,service,handler}.go + validate_test.go, handler_test.go, repository_integration_test.go. MODIFIED internal/db/db.go (+DBTX, TxRunner, PoolTx, UniqueViolation, ForeignKeyViolation) + db_test.go; internal/apperr/apperr.go (+WithFields); internal/notify/notify.go (+Disabled, non-recording) + notify_test.go; cmd/server/main.go (wire 1S, notify.Disabled).
+- 2026-10-05 Reference intake: MODIFIED CLAUDE.md, docs/00_INDEX.md, docs/02_domain_model.md, docs/04_decisions_and_corrections.md, docs/05_business_rules.md.
+- 2026-10-05 Local-only references: MODIFIED CLAUDE.md, docs/00_INDEX.md (references local-only rule); .gitignore (CLAUDE.md line removed); docs/TASKS.md.
 - 2026-10-05 P1 fixes round 1: MODIFIED migrations/0001_init.up.sql (H1, L1, L2, L3), migrations/0001_init.down.sql (comment only), docs/TASKS.md.
 
 ## Session log (append; keep each entry to 3–5 lines)
@@ -206,3 +263,10 @@ Risks (smallest fix to consider; nothing applied):
 - 2026-10-05 · Rebuild + P3 foundation + schema files · build/vet/test green (9 pkgs), gofmt clean · migration not applied or syntax-checked; D12 area check open; next P4
 - 2026-10-05 · P1 migration review (static) · 16 entities, R01–R24/U1, decided items, types, constraints checked · 1 high (RLS), 5 medium, 8 low; nothing applied or executed · left: user picks fixes; optional syntax check on disposable DB
 - 2026-10-05 · P1 fixes round 1 (H1, L1, L2, L3; notes M4, M5, L4, L6) · static re-check: 16/16 RLS, 12 indexes on existing columns, diff additive except one comment · migration still never executed; M1–M3, L5, L7, L8 wait on user
+- 2026-10-05 · References intake (datadict.txt, uc.txt, er-latest.png read in full) + migration round 2 plan · plan only; decisions logged · waiting: approval of migration plan; docs 00/02/04/05 + CLAUDE.md update; Go role constant
+- 2026-10-05 · Class diagrams intake (55 PlantUML diagrams read in full) · compared with docs/03, datadict and P4 plan · waiting: approvals (round 2, Q5, P4 changes, docs/00 + docs/03 diffs)
+- 2026-10-05 · Decisions Q1–Q6, role, Q5a–c recorded · round 2 + P4 NOT started: conditional approval, class-diagram conflicts C-P4-1..8 shown to user · waiting for per-item answers and doc diffs approval
+- 2026-10-05 · Docs D-1..D-3 applied; migration round 2 applied to file + static check (16/16 tables, datadict columns all present) · stopped at checkpoint before P4 · waiting: user go for P4; reference-intake doc diff approval
+- 2026-10-05 · references marked local-only (CLAUDE.md, docs/00); CLAUDE.md un-ignored after secret scan · reference-intake doc diff prepared, not applied · waiting: user review of intake diff, then round-2 checkpoint (already shown), then P4
+- 2026-10-05 · Reference intake applied (D1b open, C5 reworded) · round 2 kept · P4 scope listed, not started · waiting: "go P4"
+- 2026-10-05 · P4 step 1 (1S) built · go build/vet ok, gofmt clean, go test ./... 10 packages ok (56 contract test cases incl. subtests pass, 5 integration skipped) · SQL unverified (no DB) · waiting: user review before 1A

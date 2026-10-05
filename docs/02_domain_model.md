@@ -1,6 +1,6 @@
 # 02 — Domain model (production ER)
 
-Authority for names and associations. Physical types, defaults and constraints are NOT specified here — they come from the real schema in this repo (verify, do not assume).
+Authority for names and associations. Physical names, types, defaults and constraints come from the team's data dictionary (`docs/references/datadict.txt`, local-only) with the deviations recorded in `docs/04`; `migrations/0001_init.up.sql` implements them (never run yet). See §6 for data-dictionary columns that are not ER attributes.
 
 ## 1. Entities and attributes
 `{key}` = identifier shown underlined in the ER. Spelling is exact.
@@ -66,27 +66,30 @@ Meaning in practice
 - A requisition belongs to one assignment, has many items, and can generate many expense claims (so claims reference the requisition; the requisition has NO `expense_id`).
 - Equipment master data (name, active) is on EQUIPMENT; the requisition item holds request-specific quantities and price.
 - One WORK_SCHEDULE row = one worker on one date at one assignment. Scheduling several workers creates several rows.
-- Schedule–attendance is shown 1:1 (maximum). Whether attendance exists before check-in is not stated.
-- WORKER has both LOGS and REPLACES to ATTENDANCE: the original/replacement worker roles are not fully defined in the ER. Do not merge them or invent FK names.
+- Schedule–attendance is 1:1: enforced by UNIQUE (attendance.schedule_id). Whether attendance exists before check-in is not stated (D15).
+- WORKER has both LOGS and REPLACES to ATTENDANCE. Decided (D11): a replacement gets its own WORK_SCHEDULE row (uc 4A Q4A.7); `attendance.substitute_worker_id` exists per the data dictionary but is unused.
 - A deduction relates to a worker (INCURS), optionally an attendance (TRIGGERS) and a payroll (APPLIES).
-- Payroll relates to USER via RECEIVES (recipient) and PAYS (payer). Payer semantics are an open decision (D1).
-- Work evidence relates to an assignment (R11) and a worker (R20) in the ER, but some SDs also store `schedule_id` (open decision D2).
+- Payroll relates to USER via RECEIVES (`payroll.user_id`, recipient) and PAYS (`payroll.managed_by_id`, the supervisor who ran 5S manually; D1). An automatic 5S start has no payer: open D1b.
+- Work evidence relates to an assignment (R11) and a worker (R20). Decided (D2): `work_evidence` stores `assignment_id` + `worker_id`, no `schedule_id`; 4W/8A derive the assignment from the schedule.
 
-## 3. Observed value sets (from the references; physical sets are unverified)
-| Field | Values seen |
-|---|---|
-| EQUIPMENT_REQUISITION.requisition_type | `tor_base`, `additional` |
-| EQUIPMENT_REQUISITION.status | `pending_survey`, `pending_supervisor`, `pending_procurement`, `approved`, `completed`, (`rejected` implied by reject flows); `pending` appeared in an old 5W and is replaced by `pending_survey` |
-| EXPENSE_CLAIM.expense_type | `fund_transfer` (supervisor sends money), `actual_expense` (assistant's receipts) |
-| LEAVE_REQUEST.status | `pending`, `approved`, `rejected` |
-| ATTENDANCE.status | on time, late, leave, absent (exact stored strings unverified) |
-| PAYROLL.is_paid | boolean; payroll is created with `false` |
-| CONTRACT_TOR.status / COMPANY_INVOICE.status | value sets not specified |
+## 3. Value sets (decided 2026-10-05; stored as text + CHECK)
+| Field | Values | Source |
+|---|---|---|
+| USER.role | `supervisor`, `assistant`, `worker` (default `worker`) | user decision; data dictionary says `asst_supervisor` (deliberate difference) |
+| EQUIPMENT_REQUISITION.requisition_type | `tor_base`, `additional` | data dictionary, uc |
+| EQUIPMENT_REQUISITION.status | `pending_survey` (default), `pending_procurement`, `pending_supervisor`, `approved`, `rejected`, `completed` | user decision (data dictionary lists `pending_fund`, `pending_approval`, `cancelled`); `pending` in old 5W replaced by `pending_survey` |
+| EXPENSE_CLAIM.expense_type | `fund_transfer` (supervisor sends money), `actual_expense` (assistant's receipts) | data dictionary, uc |
+| LEAVE_REQUEST.status | `pending` (default), `approved`, `rejected` | data dictionary, state diagram |
+| ATTENDANCE.status | `on_time`, `late`, `leave`, `absent`; NULL until 4S | data dictionary |
+| CONTRACT_TOR.status | `registered` (default; 1S), `active`, `complete`, `cancelled` | data dictionary; who sets `active` is D16 |
+| COMPANY_INVOICE.status | `pending` (default), `paid` | data dictionary |
+| WORK_SCHEDULE.shift_status | `scheduled` (default), `completed`, `cancelled` | data dictionary; 1W display labels differ (C14) |
+| PAYROLL.is_paid | boolean; created `false` | data dictionary |
 
-Earlier business-flow documents also mention record states such as CheckedIn → CheckedOut → Calculated → Confirmed (locked) and payroll Blocked/Calculated/Approved/Paid/Reconciled. These are NOT confirmed as physical columns and conflict in shape with the single `is_paid` boolean. Do not implement them without a decision.
+Earlier business-flow documents also mention record states such as CheckedIn → CheckedOut → Calculated → Confirmed (locked) and payroll Blocked/Calculated/Approved/Paid/Reconciled. These are NOT physical columns. Do not implement them without a decision.
 
 ## 4. Things the ER does NOT tell you
-Data types and precision, ID type (UUID vs int), nullability, defaults, unique constraints, FK names, delete rules, status value sets, minimum multiplicities, the exact USER/WORKER table layout. Read the real schema. If it differs from this file, report before changing anything.
+Types, nullability, defaults, unique constraints and value sets now come from the data dictionary (§3, §6). Still not specified anywhere: delete rules, minimum multiplicities (the latest ER drawing shows circle markers on some lines whose meaning is not confirmed), and FK constraint names. If the migration differs from this file or the data dictionary, report before changing anything.
 
 ## 5. Overrides of the historical class diagram
 The class-diagram package (included under `docs/references/` as HISTORICAL) was built from the previous ER. Where it disagrees with this file, THIS FILE wins:
@@ -104,3 +107,16 @@ The class-diagram package (included under `docs/references/` as HISTORICAL) was 
 | 5W: status pending | pending_survey |
 | createDeduction(workerId, penaltyAmount, reason) | createDeduction(workerId, attendanceId, penaltyAmount, penaltyReason) |
 | createPayroll(…, totalDeduction, netPay) / calculateNetPay | writes total_deduction, net_wage; calculateNetWage / netWage |
+
+## 6. Data-dictionary columns that are not ER attributes (they implement relationships)
+| Table.column | Implements | Note |
+|---|---|---|
+| WORKER.worker_id | U1 (shared identity) | primary key and FK to `users.user_id` |
+| EQUIPMENT_REQUISITION.requested_by | R03 REQUESTS | uc SQL says `user_id`; the data dictionary name wins |
+| PAYROLL.user_id | R01 RECEIVES | replaces the old `worker_id` wording |
+| PAYROLL.managed_by_id | R24 PAYS | NOT NULL; the supervisor who runs 5S manually (D1); automatic start open (D1b) |
+| ATTENDANCE.substitute_worker_id | R18 REPLACES | nullable, unused (D11) |
+| LEAVE_REQUEST.user_id | R19 SUBMITS | FK to `users`; UNIQUE (user_id, leave_date) (D14) |
+| CONTRACT_TOR.user_id | R02 MANAGES | |
+| EXPENSE_CLAIM.user_id, requisition_id | R05 CLAIMS, R14 GENERATES | |
+| EQUIPMENT_REQUISITION.reject_reason | — | not in the data dictionary; kept by user decision until the team confirms |
