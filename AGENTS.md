@@ -1,0 +1,13 @@
+# Chaum Backend agent instructions
+
+Use the existing Go/Gin modular monolith. Current user requirements and exported Supabase metadata override older documents and migrations. Start with docs/TASKS.md. Work on feature/<name> branches; do not overwrite local changes or commit/push/deploy without a user request.
+
+Database source of truth: docs/schema/columns.json and constraints.csv (exports supplied 2026-10-08). Never run migrations, DDL, AutoMigrate, seed, or destructive SQL on Supabase. Migrations are historical design artifacts. Use public."USER", distinct worker_id/user_id, and payroll.user_id. One Worker per User is an application invariant; detect conflicts, never select an arbitrary duplicate. Money uses integer satang or exact decimal strings. Parameterize SQL and wrap related writes in transactions.
+
+All roles use server-verified LINE ID tokens resolved by "USER".line_id; reject unknown/inactive identities. Read role from DB. Web: supervisor/assistant; Mini App: worker. Assistant accesses all assignments, but has no supervisor privileges. Workers access their own records. Channel audiences are configured per interface; channels must share a LINE provider. Never log credentials, tokens, DSNs or bank details.
+
+Supervisor reviews leave; minimum notice 24 hours before scheduled start; no emergency leave. Approved leave earns no wage and no absent penalty. Assistant assigns replacements and retains the original schedule. Shifts last 8 hours, including overnight shifts. Check-in requires both signed assignment QR (60 seconds, reusable by different workers) and GPS within 200m, accuracy <=50m. One check-in per schedule. Finalize absent at shift end +2 hours. Use server time and Asia/Bangkok.
+
+Payroll periods: 1-15 and 16-month end. Late >0 and <60m: 300 THB; 60-180m: 400 THB; >180m or absent: 1500 THB. No grace. Deduction applied is capped at base wage; net >=0. Procurement: one purchase per item, actual_price is unit price; new purchases require new requests. Material cost uses actual_expense, never fund_transfer. Report revenue uses paid invoice net_received; allocate payroll by actual workdays per TOR, mark allocation estimated (no historical wage/policy snapshots).
+
+Handlers bind requests, services enforce rules, repositories execute SQL. Reuse existing foundation. Do not add success-only mock endpoints. No structured delivery history, paid_at/reference, audit trail or persistent notification outbox in this schema: document limitations. Run gofmt, go test ./..., go vet ./..., go build ./.... DB integration tests require an explicitly isolated test database; skipped means unverified. Keep docs/TASKS.md truthful and report evidence and blockers.

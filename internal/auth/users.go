@@ -30,12 +30,12 @@ func (s *UserStore) ByUserID(ctx context.Context, subject string) (Principal, er
 	if err != nil {
 		return Principal{}, ErrUserNotFound
 	}
-	return s.one(ctx, `SELECT user_id, role FROM users WHERE user_id = $1 AND is_active`, id)
+	return s.one(ctx, `SELECT user_id, role FROM public."USER" WHERE user_id = $1 AND is_active`, id)
 }
 
 // ByLineID resolves a verified LINE user id.
 func (s *UserStore) ByLineID(ctx context.Context, subject string) (Principal, error) {
-	return s.one(ctx, `SELECT user_id, role FROM users WHERE line_id = $1 AND is_active`, subject)
+	return s.one(ctx, `SELECT user_id, role FROM public."USER" WHERE line_id = $1 AND is_active`, subject)
 }
 
 func (s *UserStore) one(ctx context.Context, sql string, arg any) (Principal, error) {

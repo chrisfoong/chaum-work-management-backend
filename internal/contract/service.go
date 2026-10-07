@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -24,6 +25,7 @@ const (
 
 // Store is the data access the service needs; TORRepository implements it.
 type Store interface {
+	LockRequisitionNumbering(context.Context, db.DBTX, int32) error
 	CheckDuplicateContractNo(ctx context.Context, q db.DBTX, contractNo string) (bool, error)
 	ValidateLocation(ctx context.Context, q db.DBTX, locationID uuid.UUID) (bool, error)
 	CheckDuplicateLocationName(ctx context.Context, q db.DBTX, name string) (bool, error)
@@ -141,6 +143,10 @@ func (s *Service) ConfirmContract(ctx context.Context, userID uuid.UUID, req Con
 			result, txErr = s.confirmInTx(ctx, q, userID, c, sc, prefix)
 			return txErr
 		})
+		if ctx.Err() != nil {
+			err = errRequisitionNoTaken
+			break
+		}
 		if !errors.Is(err, errRequisitionNoTaken) {
 			break
 		}
@@ -162,6 +168,10 @@ func (s *Service) ConfirmContract(ctx context.Context, userID uuid.UUID, req Con
 }
 
 func (s *Service) confirmInTx(ctx context.Context, q db.DBTX, userID uuid.UUID, c ContractInfo, sc Scope, prefix string) (ConfirmedContract, error) {
+	day, _ := strconv.Atoi(strings.TrimPrefix(prefix, "REQ-"))
+	if err := s.store.LockRequisitionNumbering(ctx, q, int32(day)); err != nil {
+		return ConfirmedContract{}, err
+	}
 	torID, err := s.store.CreateContract(ctx, q, userID, c)
 	if name, ok := db.UniqueViolation(err); ok && name == constraintContractNo {
 		return ConfirmedContract{}, duplicateContractNo()
@@ -195,6 +205,9 @@ func (s *Service) createArea(ctx context.Context, q db.DBTX, userID, torID uuid.
 	var locationID uuid.UUID
 	if a.NewLocation != nil {
 		id, err := s.store.CreateLocation(ctx, q, a.NewLocation.Name, a.NewLocation.Address)
+		if errors.Is(err, errDuplicateLocation) {
+			return ConfirmedArea{}, duplicateLocationName(i)
+		}
 		if name, ok := db.UniqueViolation(err); ok && name == constraintLocationName {
 			return ConfirmedArea{}, duplicateLocationName(i)
 		}

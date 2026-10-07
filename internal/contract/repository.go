@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/jackc/pgx/v5/pgconn"
 	"strings"
 
 	"github.com/google/uuid"
@@ -12,11 +13,12 @@ import (
 	"chrisfoong/chaum-work-management-backend/internal/db"
 )
 
-// Constraint names the service maps to HTTP errors (migrations/0001_init.up.sql).
+// Actual constraint names from the Supabase export. Catalog names are guarded
+// in the application because the live schema has no unique name constraints.
 const (
-	constraintContractNo     = "uq_contract_tor_contract_no"
+	constraintContractNo     = "contract_tor_contract_no_key"
 	constraintLocationName   = "uq_location_location_name"
-	constraintRequisitionNo  = "uq_equipment_requisition_requisition_no"
+	constraintRequisitionNo  = "equipment_requisition_requisition_no_key"
 	constraintAssignmentLoc  = "tor_location_assignment_location_id_fkey"
 	initialRequisitionReason = "จัดเตรียมอุปกรณ์เริ่มต้นสำหรับสัญญาใหม่"
 )
@@ -59,6 +61,16 @@ func (TORRepository) CreateContract(ctx context.Context, q db.DBTX, userID uuid.
 
 // CreateLocation is Q1S.3.1.
 func (TORRepository) CreateLocation(ctx context.Context, q db.DBTX, name, address string) (uuid.UUID, error) {
+	if _, err := q.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended('catalog:location',0))`); err != nil {
+		return uuid.Nil, err
+	}
+	var exists bool
+	if err := q.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM location WHERE location_name=$1)`, name).Scan(&exists); err != nil {
+		return uuid.Nil, err
+	}
+	if exists {
+		return uuid.Nil, errDuplicateLocation
+	}
 	var id uuid.UUID
 	err := q.QueryRow(ctx,
 		`INSERT INTO location (location_name, address) VALUES ($1, $2) RETURNING location_id`,
@@ -101,7 +113,7 @@ func (TORRepository) NextRequisitionSeq(ctx context.Context, q db.DBTX, prefix s
 	err := q.QueryRow(ctx, `
 		SELECT COALESCE(MAX(split_part(requisition_no, '-', 3)::int), 0) + 1
 		FROM equipment_requisition
-		WHERE requisition_no LIKE $1 || '-%'`,
+		WHERE requisition_no ~ ('^' || $1 || '-[0-9]{1,9}$')`,
 		prefix,
 	).Scan(&next)
 	if err != nil {
@@ -128,8 +140,11 @@ func (TORRepository) CreateInitialRequisition(ctx context.Context, q db.DBTX, as
 // CreateEquipment is Q1S.6.1, made safe for concurrent requests: an existing name
 // is left untouched (ON CONFLICT DO NOTHING) and FindEquipmentByName reads the id.
 func (TORRepository) CreateEquipment(ctx context.Context, q db.DBTX, name string) error {
+	if _, err := q.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended('catalog:equipment',0))`); err != nil {
+		return err
+	}
 	_, err := q.Exec(ctx,
-		`INSERT INTO equipment (equipment_name, is_active) VALUES ($1, true) ON CONFLICT (equipment_name) DO NOTHING`,
+		`INSERT INTO equipment (equipment_name, is_active) SELECT $1::varchar,true WHERE NOT EXISTS(SELECT 1 FROM equipment WHERE equipment_name=$1::varchar)`,
 		name)
 	if err != nil {
 		return fmt.Errorf("create equipment: %w", err)
@@ -140,7 +155,14 @@ func (TORRepository) CreateEquipment(ctx context.Context, q db.DBTX, name string
 // FindEquipmentByName is Q1S.6.
 func (TORRepository) FindEquipmentByName(ctx context.Context, q db.DBTX, name string) (uuid.UUID, error) {
 	var id uuid.UUID
-	err := q.QueryRow(ctx, `SELECT equipment_id FROM equipment WHERE equipment_name = $1`, name).Scan(&id)
+	var count int
+	if err := q.QueryRow(ctx, `SELECT count(*) FROM equipment WHERE equipment_name=$1`, name).Scan(&count); err != nil {
+		return uuid.Nil, err
+	}
+	if count != 1 {
+		return uuid.Nil, fmt.Errorf("equipment name is missing or ambiguous")
+	}
+	err := q.QueryRow(ctx, `SELECT equipment_id FROM equipment WHERE equipment_name = $1 AND is_active`, name).Scan(&id)
 	if err != nil {
 		return uuid.Nil, fmt.Errorf("find equipment by name: %w", err)
 	}
@@ -190,7 +212,7 @@ func (TORRepository) SearchLocations(ctx context.Context, q db.DBTX, query strin
 // TODO(decision-12): until assistants are linked to contracts, every active
 // assistant receives the 1S notification.
 func (TORRepository) FindActiveAssistantLineIDs(ctx context.Context, q db.DBTX) ([]string, error) {
-	rows, err := q.Query(ctx, `SELECT line_id FROM users WHERE role = 'assistant' AND is_active ORDER BY user_id`)
+	rows, err := q.Query(ctx, `SELECT line_id FROM public."USER" WHERE role = 'assistant' AND is_active ORDER BY user_id`)
 	if err != nil {
 		return nil, fmt.Errorf("find assistants: %w", err)
 	}
@@ -215,3 +237,15 @@ func escapeLike(s string) string {
 
 // errRequisitionNoTaken signals that another transaction took the generated number.
 var errRequisitionNoTaken = errors.New("requisition number already taken")
+var errDuplicateLocation = errors.New("location name already exists")
+
+func (TORRepository) LockRequisitionNumbering(ctx context.Context, q db.DBTX, day int32) error {
+	_, err := q.Exec(ctx, `SELECT pg_advisory_xact_lock(17291,$1)`, day)
+	if err != nil {
+		var pg *pgconn.PgError
+		if errors.Is(err, context.DeadlineExceeded) || errors.As(err, &pg) && pg.Code == "57014" {
+			return errRequisitionNoTaken
+		}
+	}
+	return err
+}

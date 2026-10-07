@@ -1,0 +1,53 @@
+table_name,constraint_name,definition
+USER,USER_line_id_key,UNIQUE (line_id)
+USER,USER_phone_number_key,UNIQUE (phone_number)
+USER,USER_pkey,PRIMARY KEY (user_id)
+attendance,attendance_pkey,PRIMARY KEY (attendance_id)
+attendance,attendance_schedule_id_fkey,FOREIGN KEY (schedule_id) REFERENCES work_schedule(schedule_id) ON DELETE CASCADE
+attendance,attendance_schedule_id_key,UNIQUE (schedule_id)
+attendance,attendance_worker_id_fkey,FOREIGN KEY (worker_id) REFERENCES worker(worker_id) ON DELETE CASCADE
+company_invoice,company_invoice_invoice_no_key,UNIQUE (invoice_no)
+company_invoice,company_invoice_pkey,PRIMARY KEY (invoice_id)
+company_invoice,company_invoice_tor_id_fkey,FOREIGN KEY (tor_id) REFERENCES contract_tor(tor_id) ON DELETE CASCADE
+contract_tor,contract_tor_contract_no_key,UNIQUE (contract_no)
+contract_tor,contract_tor_pkey,PRIMARY KEY (tor_id)
+contract_tor,contract_tor_user_id_fkey,"FOREIGN KEY (user_id) REFERENCES ""USER""(user_id)"
+deduction_transaction,deduction_transaction_attendance_id_fkey,FOREIGN KEY (attendance_id) REFERENCES attendance(attendance_id) ON DELETE SET NULL
+deduction_transaction,deduction_transaction_payroll_id_fkey,FOREIGN KEY (payroll_id) REFERENCES payroll(payroll_id) ON DELETE SET NULL
+deduction_transaction,deduction_transaction_pkey,PRIMARY KEY (deduction_id)
+deduction_transaction,deduction_transaction_worker_id_fkey,FOREIGN KEY (worker_id) REFERENCES worker(worker_id) ON DELETE CASCADE
+equipment,equipment_pkey,PRIMARY KEY (equipment_id)
+equipment_requisition,equipment_requisition_assignment_id_fkey,FOREIGN KEY (assignment_id) REFERENCES tor_location_assignment(assignment_id) ON DELETE CASCADE
+equipment_requisition,equipment_requisition_pkey,PRIMARY KEY (requisition_id)
+equipment_requisition,equipment_requisition_requested_by_fkey,"FOREIGN KEY (requested_by) REFERENCES ""USER""(user_id)"
+equipment_requisition,equipment_requisition_requisition_no_key,UNIQUE (requisition_no)
+equipment_requisition,equipment_requisition_reviewed_by_fkey,"FOREIGN KEY (reviewed_by) REFERENCES ""USER""(user_id)"
+expense_claim,expense_claim_expense_no_key,UNIQUE (expense_no)
+expense_claim,expense_claim_pkey,PRIMARY KEY (expense_id)
+expense_claim,expense_claim_requisition_id_fkey,FOREIGN KEY (requisition_id) REFERENCES equipment_requisition(requisition_id) ON DELETE CASCADE
+expense_claim,expense_claim_total_amount_check,CHECK ((total_amount > (0)::numeric))
+expense_claim,expense_claim_transfer_ref_no_key,UNIQUE (transfer_ref_no)
+expense_claim,expense_claim_user_id_fkey,"FOREIGN KEY (user_id) REFERENCES ""USER""(user_id)"
+leave_request,leave_request_leave_no_key,UNIQUE (leave_no)
+leave_request,leave_request_pkey,PRIMARY KEY (request_id)
+leave_request,leave_request_user_id_fkey,"FOREIGN KEY (user_id) REFERENCES ""USER""(user_id) ON DELETE CASCADE"
+location,location_pkey,PRIMARY KEY (location_id)
+payroll,payroll_managed_by_id_fkey,"FOREIGN KEY (managed_by_id) REFERENCES ""USER""(user_id)"
+payroll,payroll_payroll_slip_no_key,UNIQUE (payroll_slip_no)
+payroll,payroll_pkey,PRIMARY KEY (payroll_id)
+payroll,payroll_user_id_fkey,"FOREIGN KEY (user_id) REFERENCES ""USER""(user_id) ON DELETE CASCADE"
+requisition_item,requisition_item_equipment_id_fkey,FOREIGN KEY (equipment_id) REFERENCES equipment(equipment_id) ON DELETE RESTRICT
+requisition_item,requisition_item_pkey,PRIMARY KEY (item_id)
+requisition_item,requisition_item_requisition_id_fkey,FOREIGN KEY (requisition_id) REFERENCES equipment_requisition(requisition_id) ON DELETE CASCADE
+tor_location_assignment,tor_location_assignment_location_id_fkey,FOREIGN KEY (location_id) REFERENCES location(location_id) ON DELETE RESTRICT
+tor_location_assignment,tor_location_assignment_pkey,PRIMARY KEY (assignment_id)
+tor_location_assignment,tor_location_assignment_tor_id_fkey,FOREIGN KEY (tor_id) REFERENCES contract_tor(tor_id) ON DELETE CASCADE
+work_evidence,work_evidence_pkey,PRIMARY KEY (evidence_id)
+work_evidence,work_evidence_schedule_id_fkey,FOREIGN KEY (schedule_id) REFERENCES work_schedule(schedule_id) ON DELETE CASCADE
+work_evidence,work_evidence_worker_id_fkey,FOREIGN KEY (worker_id) REFERENCES worker(worker_id) ON DELETE CASCADE
+work_schedule,work_schedule_assignment_id_fkey,FOREIGN KEY (assignment_id) REFERENCES tor_location_assignment(assignment_id) ON DELETE CASCADE
+work_schedule,work_schedule_pkey,PRIMARY KEY (schedule_id)
+work_schedule,work_schedule_worker_id_fkey,FOREIGN KEY (worker_id) REFERENCES worker(worker_id) ON DELETE CASCADE
+work_schedule,work_schedule_worker_id_work_date_key,"UNIQUE (worker_id, work_date)"
+worker,worker_pkey,PRIMARY KEY (worker_id)
+worker,worker_user_id_fkey,"FOREIGN KEY (user_id) REFERENCES ""USER""(user_id) ON DELETE CASCADE"

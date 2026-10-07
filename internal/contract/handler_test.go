@@ -49,7 +49,8 @@ type fakeStore struct {
 	equipmentCreated []string
 }
 
-func (f *fakeStore) call(name string) { f.calls = append(f.calls, name) }
+func (f *fakeStore) call(name string)                                               { f.calls = append(f.calls, name) }
+func (f *fakeStore) LockRequisitionNumbering(context.Context, db.DBTX, int32) error { return nil }
 
 func (f *fakeStore) CheckDuplicateContractNo(context.Context, db.DBTX, string) (bool, error) {
 	f.call("checkDuplicateContractNo")

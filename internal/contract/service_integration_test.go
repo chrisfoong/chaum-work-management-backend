@@ -37,7 +37,7 @@ func insertCommittedSupervisor(t *testing.T, pool *pgxpool.Pool) uuid.UUID {
 	var id uuid.UUID
 	suffix := rand.Int64N(1e8)
 	err := pool.QueryRow(context.Background(), `
-		INSERT INTO users (first_name, last_name, phone_number, role, line_id, bank_name, bank_account_no)
+		INSERT INTO public."USER" (first_name, last_name, phone_number, role, line_id, bank_name, bank_account_no)
 		VALUES ('ทดสอบ', 'พร้อมกัน', $1, 'supervisor', $2, 'test', '000')
 		RETURNING user_id`,
 		fmt.Sprintf("09%08d", suffix), fmt.Sprintf("U%032x", suffix)).Scan(&id)

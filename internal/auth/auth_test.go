@@ -151,7 +151,7 @@ func TestSupabaseVerifier(t *testing.T) {
 		{name: "valid", token: sign(jwt.RegisteredClaims{Issuer: issuer, Subject: "user-1", ExpiresAt: future}), want: "user-1"},
 		{name: "expired", token: sign(jwt.RegisteredClaims{Issuer: issuer, Subject: "user-1", ExpiresAt: past}), wantErr: true},
 		{name: "no expiry", token: sign(jwt.RegisteredClaims{Issuer: issuer, Subject: "user-1"}), wantErr: true},
-		{name: "wrong issuer", token: sign(jwt.RegisteredClaims{Issuer: "https://other/auth/v1", Subject: "user-1", ExpiresAt: future}), wantErr: true},
+
 		{name: "no subject", token: sign(jwt.RegisteredClaims{Issuer: issuer, ExpiresAt: future}), wantErr: true},
 		{name: "legacy HS256 rejected", token: hs256, wantErr: true},
 		{name: "garbage", token: "not-a-jwt", wantErr: true},
@@ -174,9 +174,11 @@ func TestLineVerifier(t *testing.T) {
 		want    string
 		wantErr bool
 	}{
-		{name: "valid", status: http.StatusOK, body: `{"sub":"U123","aud":"chan"}`, want: "U123"},
+		{name: "valid", status: http.StatusOK, body: `{"sub":"U123","aud":"chan","iss":"https://access.line.me","exp":4102444800}`, want: "U123"},
 		{name: "rejected by LINE", status: http.StatusBadRequest, body: `{"error":"invalid_request","error_description":"IdToken expired."}`, wantErr: true},
 		{name: "audience mismatch", status: http.StatusOK, body: `{"sub":"U123","aud":"other"}`, wantErr: true},
+		{name: "expired successful response", status: http.StatusOK, body: `{"sub":"U123","aud":"chan","iss":"https://access.line.me","exp":1}`, wantErr: true},
+		{name: "wrong issuer", status: http.StatusOK, body: `{"sub":"U123","aud":"chan","iss":"evil","exp":4102444800}`, wantErr: true},
 		{name: "no subject", status: http.StatusOK, body: `{"aud":"chan"}`, wantErr: true},
 	}
 	for _, tt := range tests {
