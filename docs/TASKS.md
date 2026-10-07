@@ -24,9 +24,11 @@ Baseline develop build passed; test/vet failed on missing testPool and LockRequi
 
 Final prepared stack: gofmt, go test -count=1 ./..., go vet ./..., go build ./... passed 2026-10-08. Database integration ran on fresh loopback PostgreSQL17 with isolated fixture: concurrent check-in/payroll, evidence rollback, leave/replacement/absence, procurement retries, invoices/profit and duplicate Worker conflicts. LINE/Storage tests use local HTTP fixtures.
 
-User authorized local commits, feature pushes and Draft PRs on 2026-10-08; no merge/deployment. Publication in progress. Stacked features must be reviewed/merged in dependency order.
+User authorized local commits, feature pushes and Draft PRs on 2026-10-08; no merge/deployment. Local commits complete. Push rejected with GitHub 403: Sxthxwit lacks Write permission; no Draft PR created. See PR_PLAN.md for prepared descriptions. Stacked features must be reviewed/merged in dependency order.
 
 ## Blocked / integration unverified
+
+- [ ] Publish Draft PRs: repository Write access or approved fork workflow required.
 
 - [ ] Live Supabase schema/enum check: no live credentials used; fixture labels are expectations.
 - [ ] Real LINE tokens and same-provider membership: confirm channels in LINE Developers.
