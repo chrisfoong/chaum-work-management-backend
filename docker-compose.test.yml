@@ -1,0 +1,20 @@
+# Throwaway PostgreSQL for local integration tests ONLY. No secrets in this file:
+# the password comes from TEST_DB_PASSWORD in your shell. Data lives in tmpfs and
+# disappears on `docker compose -f docker-compose.test.yml down -v`.
+services:
+  test-db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: chaum_test
+      POSTGRES_DB: chaum_test
+      POSTGRES_PASSWORD: ${TEST_DB_PASSWORD:?set TEST_DB_PASSWORD}
+    ports:
+      - "127.0.0.1:54329:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      # TCP check: does not pass while the image's init (socket-only) server is running.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U chaum_test -d chaum_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
