@@ -9,8 +9,8 @@ const (
  JOIN work_schedule sc ON sc.worker_id=w.worker_id AND sc.work_date BETWEEN p.period_start AND p.period_end
  JOIN attendance at ON at.schedule_id=sc.schedule_id AND at.worker_id=sc.worker_id AND at.work_date=sc.work_date
  JOIN tor_location_assignment a ON a.assignment_id=sc.assignment_id
- WHERE to_char(p.period_start,'YYYY-MM')=$1 AND at.status IN ('on_time','late') AND sc.shift_status<>'cancelled'
- AND NOT EXISTS(SELECT 1 FROM leave_request l WHERE l.user_id=w.user_id AND l.leave_date=sc.work_date AND l.status='approved')
+ WHERE p.is_paid AND to_char(p.period_start,'YYYY-MM')=$1 AND at.status IN ('on_time','late') AND sc.shift_status<>'cancelled'
+ AND NOT EXISTS(SELECT 1 FROM leave_request l WHERE l.user_id=w.user_id AND l.leave_date=sc.work_date AND l.status='approved' AND l.is_advance_notice)
  GROUP BY p.payroll_id,p.net_wage,a.tor_id),
  shares AS (SELECT *,net_wage*100*days/sum(days) OVER(PARTITION BY payroll_id) AS exact FROM days),
  rounded AS(SELECT *,floor(exact) AS cents,row_number() OVER(PARTITION BY payroll_id ORDER BY exact-floor(exact) DESC,tor_id) AS rank FROM shares),

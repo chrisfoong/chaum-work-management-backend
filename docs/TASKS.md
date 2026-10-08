@@ -1,44 +1,33 @@
 # Backend task tracker
 
-Updated 2026-10-08. Source: user agreement, exported metadata, existing code/docs. Continue develop Foundation. Old tracker: historical/TASKS-2026-10-05.md.
+Updated 2026-10-08. Business authority: latest SA-Group5 Use Case Descriptions adopted by user. Physical authority: Supabase exports. Existing develop Foundation retained. REQUIREMENTS.md records reconciliations; API.md documents routes.
 
 ## Implemented and verified locally
 
-- [x] public."USER", distinct worker_id/user_id, payroll.user_id, actual constraint names and read-only generated quantity.
-- [x] Read-only startup schema/enum compatibility checks; no live DDL/migrations.
-- [x] LINE Web/Mini App audiences/issuer/expiry, DB roles, unknown/inactive rejection and duplicate Worker conflicts.
-- [x] Existing TOR preview/confirm, numbering concurrency and application name guards.
-- [x] User/Worker/catalog/contract management and ownership.
-- [x] Assistant schedules,24h leave notice, Supervisor review, unpaid approved leave/no absence penalty, replacement.
-- [x] QR+GPS200m/accuracy50m, eight-hour overnight shifts, evidence checkout, rerunnable absent finalization.
-- [x] Requisition survey/review/funding/purchase, one purchase/item, actual unit prices, separate material/transfer accounting.
-- [x] Half-month payroll, exact satang, penalty tiers/cap, concurrency/overlap guards and payslips.
-- [x] Invoice receipts, estimated TOR payroll allocation, profit JSON/CSV and dashboards.
-- [x] Private Storage proxy, evidence validation, best-effort LINE notifications with explicit failures.
-- [x] Shared entry point, safe logging/errors, request IDs, explicit CORS, timeouts/graceful shutdown.
-- [x] Current agent rules, requirements, historical docs, placeholders and API documentation.
+- [x] Existing schema mapping, LINE auth, ownership, TOR Foundation preserved.
+- [x] 3A active contract/equipment readiness/minimum staffing/one worker-day guards.
+- [x] 2W emergency/advance dates; 4A Assistant review plus atomic replacement and rollback.
+- [x] 4S advance-only leave exemption; emergency absence penalty; GPS/QR and overnight behavior retained.
+- [x] 5W active attendance gate; 5A TOR-wide inspection; 6A explicit purchase/no_purchase.
+- [x] 1A base survey; 2S/3S funding/approval; 2A/7A partial repeated purchases, replay guard, latest/weighted prices and zero-cost rounds.
+- [x] 8A matching recipient delivery/photos, transactional rollback/retry and post-delivery notification.
+- [x] 5S atomic payroll batch/retries; 7W own paid slips and month filter.
+- [x] 6S paid-only labor, TOR/date filters, JSON/CSV/PDF, confirmation snapshot; 9A active-contract continuation data.
+- [x] Agent rules, requirements, API models, README and verification notes updated.
 
 ## Evidence
 
-Baseline develop build passed; test/vet failed on missing testPool and LockRequisitionNumbering. These preexisting failures are repaired.
+Baseline go test/vet/build passed after using writable GOCACHE; default cache had access denied. Baseline integration initially unverified.
 
-Final prepared stack: gofmt, go test -count=1 ./..., go vet ./..., go build ./... passed 2026-10-08. Database integration ran on fresh loopback PostgreSQL17 with isolated fixture: concurrent check-in/payroll, evidence rollback, leave/replacement/absence, procurement retries, invoices/profit and duplicate Worker conflicts. LINE/Storage tests use local HTTP fixtures.
+Changed code: gofmt, go test -count=1 ./..., go vet ./..., go build ./... passed with explicitly isolated loopback PostgreSQL17. Tests cover existing auth/ownership and atomic leave rollback, emergency penalties, batch retries, active-attendance requests, decisions, simultaneous/partial purchases, latest/weighted prices, zero-cost rounds, delivery rollback/retries and paid labor. PDF parsed as three pages preserving all 25 test rows, rendered and visually inspected. 169 tests/subtests passed, zero skipped on final repository verification. No .env inspection or Supabase writes.
 
-User authorized local commits, feature pushes and Draft PRs on 2026-10-08; no merge/deployment. Local commits complete. Push rejected with GitHub 403: Sxthxwit lacks Write permission; no Draft PR created. See PR_PLAN.md for prepared descriptions. Stacked features must be reviewed/merged in dependency order.
+## Blocked / live integration unverified
 
-## Blocked / integration unverified
+- [ ] Deployed LINE/provider, private Storage and actual message delivery need end-to-end verification.
+- [ ] Publish Draft PR: prior remote push rejected 403; Write access required.
+- [ ] Persistent closing ledger, durable notification retries and item-round history need approved persistence design; no schema change authorized.
+- [ ] PDF Thai project-name typography; current PDF identifies TOR by UUID and uses English fields.
 
-- [ ] Publish Draft PRs: repository Write access or approved fork workflow required.
+## Unchanged-schema limits
 
-- [ ] Live Supabase schema/enum check: no live credentials used; fixture labels are expectations.
-- [ ] Real LINE tokens and same-provider membership: confirm channels in LINE Developers.
-- [ ] Existing private Storage bucket/policies and real evidence roundtrip.
-- [ ] Real messaging delivery/recipient eligibility: API acceptance does not prove delivery.
-
-## Planned / unchanged-schema limits
-
-- [ ] PDF export, richer list filters and frontend end-to-end testing.
-- [ ] Durable retry/outbox, wage snapshots and correction audit need an approved persistence design.
-- [ ] Delivery history and payment timestamp/reference unavailable in schema.
-
-Application locks cover backend writers, not direct DB writers. Replacement retains original schedule without a durable replacement relation. Uploads can leave unused objects. Funding references/invoice receipts allow matching-payload retries; repeat purchases conflict. No automatic financial transfers.
+UUIDs/real enum labels override illustrative document SQL. Payroll uses user_id; generated to_buy_qty is never written. Delivery evidence uses a description prefix without DB FK/delivery status. Closing explicitly returns persisted=false. No durable outbox, historical wage snapshots or replacement relation. Backend locks do not cover direct DB writers. None of these limitations are claimed as implemented persistent facilities.

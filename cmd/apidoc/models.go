@@ -36,7 +36,10 @@ func model(t reflect.Type) map[string]any {
 				continue
 			}
 			props[name] = model(f.Type)
-			if !strings.Contains(tag, "omitempty") && (f.Type.Kind() != reflect.Pointer || t.Name() == "CheckIn") && name != "daily_wage" && name != "remark" && !(name == "reason" && (t.Name() == "ReviewInput" || t.Name() == "InvoiceInput")) {
+			if name == "expected_actual_qty" {
+				props[name].(map[string]any)["nullable"] = false
+			}
+			if !strings.Contains(tag, "omitempty") && (f.Type.Kind() != reflect.Pointer || t.Name() == "CheckIn" || name == "expected_actual_qty") && name != "daily_wage" && name != "remark" && name != "replacement_worker_id" && !(name == "receipt_path" && t.Name() == "PurchaseInput") && !(name == "reason" && (t.Name() == "ReviewInput" || t.Name() == "InvoiceInput")) {
 				required = append(required, name)
 			}
 		}
@@ -66,9 +69,10 @@ func requestModels() map[string]any {
 		"POST /api/web/contracts/info": contract.ContractInfo{}, "POST /api/web/contracts/scope": contract.Scope{}, "POST /api/web/contracts/confirm": contract.ConfirmRequest{},
 		"POST /api/web/users": work.UserInput{}, "PATCH /api/web/users/{id}": work.UserUpdate{}, "PATCH /api/web/contracts/{id}": state,
 		"POST /api/web/locations": work.LocationInput{}, "PATCH /api/web/locations/{id}": work.LocationInput{}, "POST /api/web/equipment": work.EquipmentInput{}, "PATCH /api/web/equipment/{id}": work.EquipmentInput{},
-		"POST /api/web/schedules": work.ScheduleInput{}, "POST /api/liff/leave-requests": work.LeaveInput{}, "POST /api/web/leave-requests/{id}/review": state, "POST /api/web/leave-requests/{id}/replacement": replacement,
+		"POST /api/web/schedules": work.ScheduleInput{}, "POST /api/liff/leave-requests": work.LeaveInput{}, "POST /api/web/leave-requests/{id}/review": work.LeaveReviewInput{}, "POST /api/web/leave-requests/{id}/replacement": replacement,
 		"POST /api/liff/attendance/check-in": work.CheckIn{}, "POST /api/liff/attendance/check-out": work.CheckOut{}, "POST /api/liff/requisitions": work.RequestInput{}, "POST /api/web/requisitions/{id}/survey": survey, "POST /api/web/requisitions/{id}/review": review, "POST /api/web/requisitions/{id}/fund-transfers": work.FundInput{}, "POST /api/web/requisitions/{id}/purchase": work.PurchaseInput{},
 		"POST /api/web/payroll/preview": work.PayrollInput{}, "POST /api/web/payroll": work.PayrollInput{}, "POST /api/web/invoices": work.InvoiceInput{}, "POST /api/web/invoices/{id}/mark-paid": paid,
+		"POST /api/web/payroll/batch": work.PayrollBatchInput{}, "POST /api/web/requisitions/{id}/decision": work.ProcurementDecision{}, "POST /api/web/requisitions/{id}/delivery": work.DeliveryInput{}, "POST /api/web/reports/profit/confirm": work.ProfitConfirmation{},
 	}
 }
 func describeRequest(method, path string, op map[string]any) {
@@ -79,8 +83,14 @@ func describeRequest(method, path string, op map[string]any) {
 		op["requestBody"] = map[string]any{"required": true, "content": map[string]any{"application/octet-stream": map[string]any{"schema": map[string]string{"type": "string", "format": "binary"}}}}
 	}
 	if method == "GET" {
-		if strings.HasSuffix(path, "/reports/profit") || strings.HasSuffix(path, "/reports/profit.csv") {
-			op["parameters"] = []map[string]any{{"name": "month", "in": "query", "required": true, "schema": map[string]string{"type": "string", "pattern": `^\d{4}-\d{2}$`}}}
+		if strings.HasSuffix(path, "/reports/profit") || strings.HasSuffix(path, "/reports/profit.csv") || strings.HasSuffix(path, "/reports/profit.pdf") {
+			op["parameters"] = []map[string]any{{"name": "month", "in": "query", "required": false, "schema": map[string]string{"type": "string", "pattern": `^\d{4}-\d{2}$`}}, {"name": "tor_id", "in": "query", "schema": map[string]string{"type": "string", "format": "uuid"}}, {"name": "period_start", "in": "query", "schema": map[string]string{"type": "string", "format": "date"}}, {"name": "period_end", "in": "query", "schema": map[string]string{"type": "string", "format": "date"}}}
+		}
+		if strings.HasSuffix(path, "/payroll") {
+			op["parameters"] = []map[string]any{{"name": "period_month", "in": "query", "schema": map[string]string{"type": "string", "pattern": `^\d{4}-\d{2}$`}}}
+		}
+		if strings.HasSuffix(path, "/reports/profit.pdf") {
+			op["responses"].(map[string]any)["200"] = map[string]any{"description": "Financial PDF with TOR identifiers and amounts", "content": map[string]any{"application/pdf": map[string]any{"schema": map[string]string{"type": "string", "format": "binary"}}}}
 		}
 		if strings.HasSuffix(path, "/files") {
 			op["parameters"] = []map[string]any{{"name": "path", "in": "query", "required": true, "schema": map[string]string{"type": "string"}}}

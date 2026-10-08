@@ -19,7 +19,20 @@ func TestMutationRoleBoundaries(t *testing.T) {
 	tests := []struct {
 		method, path string
 		role         auth.Role
-	}{{"POST", "/users", auth.RoleAssistant}, {"PATCH", "/users/" + id, auth.RoleAssistant}, {"POST", "/leave-requests/" + id + "/review", auth.RoleAssistant}, {"POST", "/payroll", auth.RoleAssistant}, {"POST", "/payroll/" + id + "/mark-paid", auth.RoleAssistant}, {"POST", "/invoices", auth.RoleAssistant}, {"POST", "/requisitions/" + id + "/review", auth.RoleAssistant}, {"POST", "/requisitions/" + id + "/fund-transfers", auth.RoleAssistant}, {"POST", "/schedules", auth.RoleSupervisor}, {"POST", "/leave-requests/" + id + "/replacement", auth.RoleSupervisor}, {"POST", "/requisitions/" + id + "/purchase", auth.RoleSupervisor}}
+	}{{"POST", "/users", auth.RoleAssistant}, {"PATCH", "/users/" + id, auth.RoleAssistant}, {"POST", "/leave-requests/" + id + "/review", auth.RoleSupervisor}, {"POST", "/payroll", auth.RoleAssistant}, {"POST", "/payroll/" + id + "/mark-paid", auth.RoleAssistant}, {"POST", "/invoices", auth.RoleAssistant}, {"POST", "/requisitions/" + id + "/review", auth.RoleAssistant}, {"POST", "/requisitions/" + id + "/fund-transfers", auth.RoleAssistant}, {"POST", "/schedules", auth.RoleSupervisor}, {"POST", "/leave-requests/" + id + "/replacement", auth.RoleSupervisor}, {"POST", "/requisitions/" + id + "/purchase", auth.RoleSupervisor}}
+	tests = append(tests, struct {
+		method, path string
+		role         auth.Role
+	}{"POST", "/requisitions/" + id + "/decision", auth.RoleSupervisor}, struct {
+		method, path string
+		role         auth.Role
+	}{"POST", "/requisitions/" + id + "/delivery", auth.RoleSupervisor}, struct {
+		method, path string
+		role         auth.Role
+	}{"POST", "/payroll/batch", auth.RoleAssistant}, struct {
+		method, path string
+		role         auth.Role
+	}{"POST", "/reports/profit/confirm", auth.RoleAssistant})
 	for _, tt := range tests {
 		t.Run(tt.method+tt.path, func(t *testing.T) {
 			r := gin.New()

@@ -24,8 +24,12 @@ func (s *Service) Event(kind, id string) {
 			sql = query24
 		case "leave_review":
 			sql = query25
-		case "purchase", "request_review":
+		case "delivery", "request_review":
 			sql = query26
+		case "approval_needed", "purchase_funding", "replacement_needed":
+			sql = `SELECT user_id::text FROM public."USER" WHERE role='supervisor' AND is_active AND $1::uuid IS NOT NULL`
+		case "funded", "continuation":
+			sql = query27
 		case "request":
 			sql = query27
 		case "payroll":
@@ -52,7 +56,14 @@ func (s *Service) Event(kind, id string) {
 			return
 		}
 		for _, user := range ids {
-			s.notify(ctx, user, "Chaum: "+kind+" updated. Please open the app to view details.")
+			message := "Chaum: " + kind + " updated. Please open the app to view details."
+			if kind == "request_review" {
+				var state, reason string
+				if s.Repo.Pool.QueryRow(ctx, `SELECT status::text,reason FROM equipment_requisition WHERE requisition_id=$1`, id).Scan(&state, &reason) == nil && state == "rejected" {
+					message = "Chaum: equipment request rejected. " + reason
+				}
+			}
+			s.notify(ctx, user, message)
 		}
 	}()
 }

@@ -1,5 +1,7 @@
-# 07 — Verification checklist and acceptance checks
+# Backend verification
 
-Current requirements: [REQUIREMENTS.md](REQUIREMENTS.md), [../AGENTS.md](../AGENTS.md). Physical schema: [schema/columns.json](schema/columns.json) and constraints.csv.
+Run gofmt, go test -count=1 ./..., go vet ./..., go build ./.... Integration requires TEST_DATABASE_URL to isolated loopback PostgreSQL plus TEST_DATABASE_ISOLATED=yes. Never inspect .env or write integration data to shared Supabase. Skipped means unverified.
 
-The 2026-10-05 version is archived in [historical/07_verification_checklist.md](historical/07_verification_checklist.md). It is historical design context, not an active schema or auth instruction. Reconciliation and implementation status are in [TASKS.md](TASKS.md).
+Checks cover Assistant leave role, atomic replacement rollback, emergency/advance absence, purchase replay/concurrency and zero-cost policy, latest/weighted price, delivery multi-photo rollback/retry, batch payroll reuse, paid-only labor, PDF parsing/rendering, plus existing LINE audience/ownership/schema tests.
+
+Live LINE/Storage/message delivery and remote PR publication are separate unverified steps. See TASKS.md for evidence and limits.

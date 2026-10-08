@@ -45,7 +45,7 @@ func (s *Service) Requisition(ctx context.Context, p auth.Principal, in RequestI
 				return e
 			}
 			var own bool
-			if e = s.Repo.Row(ctx, q, query65, worker, in.AssignmentID).Scan(&own); e != nil {
+			if e = s.Repo.Row(ctx, q, query65, worker, in.AssignmentID, s.Now()).Scan(&own); e != nil {
 				return e
 			}
 			if !own {
@@ -116,8 +116,8 @@ func (s *Service) Survey(ctx context.Context, id string, items []SurveyItem) err
 		if e := s.Repo.Row(ctx, q, query70, id).Scan(&state, &kind); e != nil {
 			return e
 		}
-		if state != "pending_survey" {
-			return conflict("survey already submitted")
+		if state != "pending_survey" || kind != "tor_base" {
+			return conflict("only pending TOR base requests may be surveyed; additional requests use inspection and decision")
 		}
 		var count int
 		if e := s.Repo.Row(ctx, q, query71, id).Scan(&count); e != nil {
@@ -168,7 +168,7 @@ func (s *Service) ReviewRequest(ctx context.Context, p auth.Principal, id string
 			return e
 		}
 	}
-	return s.Repo.Transaction(ctx, func(q Query) error {
+	err := s.Repo.Transaction(ctx, func(q Query) error {
 		var state string
 		if e := s.Repo.Row(ctx, q, query75, id).Scan(&state); e != nil {
 			return e
@@ -183,6 +183,10 @@ func (s *Service) ReviewRequest(ctx context.Context, p auth.Principal, id string
 		_, e := s.Repo.Exec(ctx, q, query76, id, next, p.UserID, s.Now(), in.Reason)
 		return e
 	})
+	if err == nil {
+		s.Event("request_review", id)
+	}
+	return err
 }
 
 type FundInput struct {
@@ -234,6 +238,9 @@ func (s *Service) Fund(ctx context.Context, p auth.Principal, id string, in Fund
 		_, e = s.Repo.Exec(ctx, q, query80, id)
 		return e
 	})
+	if e == nil {
+		s.Event("funded", id)
+	}
 	return expense, e
 }
 
@@ -241,6 +248,7 @@ type PurchaseItem struct {
 	ItemID   string `json:"item_id"`
 	Quantity int    `json:"actual_qty"`
 	Price    string `json:"actual_price"`
+	Expected *int   `json:"expected_actual_qty"`
 }
 type PurchaseInput struct {
 	Items   []PurchaseItem `json:"items"`
@@ -261,8 +269,8 @@ func (s *Service) Purchase(ctx context.Context, p auth.Principal, id string, in 
 			return "", e
 		}
 		price, e := Money(it.Price)
-		if e != nil || price <= 0 || it.Quantity <= 0 || it.Quantity > 1000000 || price > 9999999999 {
-			return "", invalid("items", "positive quantity and price required")
+		if e != nil || price < 0 || it.Quantity < 0 || it.Quantity > 1000000 || price > 9999999999 {
+			return "", invalid("items", "nonnegative quantity and price required")
 		}
 		if _, ok := prices[it.ItemID]; ok {
 			return "", invalid("items", "duplicate item")
@@ -270,39 +278,84 @@ func (s *Service) Purchase(ctx context.Context, p auth.Principal, id string, in 
 		prices[it.ItemID] = price
 		total += price * int64(it.Quantity)
 	}
+	positive := false
+	for _, it := range in.Items {
+		if it.Quantity > 0 {
+			positive = true
+		}
+		if it.Expected == nil || *it.Expected < 0 {
+			return "", invalid("expected_actual_qty", "current cumulative quantity required to prevent replay")
+		}
+	}
+	if !positive {
+		return "", invalid("items", "at least one positive quantity required")
+	}
 	if total > 9999999999 {
 		return "", invalid("amount", "total exceeds NUMERIC(10,2)")
 	}
-	if e := s.evidence(ctx, p, in.Receipt); e != nil {
-		return "", e
+	if total > 0 {
+		if e := s.evidence(ctx, p, in.Receipt); e != nil {
+			return "", e
+		}
 	}
-	var expense string
+	var expense, nextState string
 	e := s.Repo.Transaction(ctx, func(q Query) error {
-		var state string
-		if e := s.Repo.Row(ctx, q, query81, id).Scan(&state); e != nil {
+		var state, kind string
+		var approved bool
+		if e := s.Repo.Row(ctx, q, query81, id).Scan(&state, &kind, &approved); e != nil {
 			return e
 		}
-		if state != "pending_procurement" {
+		if state != "pending_procurement" || (kind == "additional" && !approved) {
 			return conflict("request is not ready for procurement")
+		}
+		if kind == "additional" {
+			var funded bool
+			if e := q.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM expense_claim WHERE requisition_id=$1 AND expense_type='fund_transfer')`, id).Scan(&funded); e != nil {
+				return e
+			}
+			if !funded {
+				return conflict("additional purchase requires Supervisor funding")
+			}
+		}
+		if kind == "additional" && total > 0 {
+			if e := s.evidencePhoto(ctx, p, in.Receipt); e != nil {
+				return e
+			}
 		}
 		for _, it := range in.Items {
 			var buy int
-			var actual *int
-			if e := s.Repo.Row(ctx, q, query82, it.ItemID, id).Scan(&buy, &actual); e != nil {
+			var actual int
+			var oldPrice string
+			if e := s.Repo.Row(ctx, q, query82, it.ItemID, id).Scan(&buy, &actual, &oldPrice); e != nil {
 				return e
 			}
-			if actual != nil {
-				return conflict("item already purchased; retries return conflict, not exactly-once success")
+			if actual != *it.Expected {
+				return conflict("purchase quantity changed; reload before confirming")
 			}
-			if it.Quantity != buy {
-				return invalid("actual_qty", "single purchase must cover the surveyed quantity")
+			if it.Quantity > buy-actual {
+				return invalid("actual_qty", "quantity exceeds remaining requirement")
 			}
-			if _, e := s.Repo.Exec(ctx, q, query83, it.ItemID, it.Quantity, Decimal(prices[it.ItemID])); e != nil {
+			if it.Quantity == 0 {
+				continue
+			}
+			if _, e := s.Repo.Exec(ctx, q, query83, it.ItemID, it.Quantity, Decimal(prices[it.ItemID]), kind == "additional"); e != nil {
 				return e
 			}
 		}
-		if e := s.Repo.Row(ctx, q, query84, document("EXP"), p.UserID, id, Decimal(total), in.Receipt).Scan(&expense); e != nil {
-			return e
+		if total > 0 {
+			if e := lock(ctx, q, "purchase-receipt:"+in.Receipt); e != nil {
+				return e
+			}
+			var used bool
+			if e := q.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM expense_claim WHERE expense_type='actual_expense' AND receipt_photo_url=$1)`, in.Receipt).Scan(&used); e != nil {
+				return e
+			}
+			if used {
+				return conflict("receipt already used for a purchase")
+			}
+			if e := s.Repo.Row(ctx, q, query84, document("EXP"), p.UserID, id, Decimal(total), in.Receipt).Scan(&expense); e != nil {
+				return e
+			}
 		}
 		var missing bool
 		if e := s.Repo.Row(ctx, q, query85, id).Scan(&missing); e != nil {
@@ -312,11 +365,14 @@ func (s *Service) Purchase(ctx context.Context, p auth.Principal, id string, in 
 		if missing {
 			next = "pending_fund"
 		}
+		nextState = next
 		_, e := s.Repo.Exec(ctx, q, query86, id, next)
 		return e
 	})
 	if e == nil {
-		s.Event("purchase", id)
+		if nextState == "pending_fund" {
+			s.Event("purchase_funding", id)
+		}
 	}
 	return expense, e
 }

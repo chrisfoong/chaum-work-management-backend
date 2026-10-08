@@ -392,6 +392,16 @@
     },
     "/api/liff/payroll": {
       "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "period_month",
+            "schema": {
+              "pattern": "^\\d{4}-\\d{2}$",
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful operation; see docs/API.md for payloads"
@@ -1105,6 +1115,44 @@
         "summary": "PATCH /api/web/contracts/{id}"
       }
     },
+    "/api/web/contracts/{id}/continuation": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation; see docs/API.md for payloads"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Unverified, inactive or unknown LINE identity"
+          },
+          "403": {
+            "description": "Role or ownership denied"
+          },
+          "409": {
+            "description": "State conflict"
+          }
+        },
+        "security": [
+          {
+            "lineIDToken": []
+          }
+        ],
+        "summary": "GET /api/web/contracts/{id}/continuation"
+      }
+    },
     "/api/web/dashboard": {
       "get": {
         "responses": {
@@ -1588,6 +1636,9 @@
               "schema": {
                 "additionalProperties": false,
                 "properties": {
+                  "replacement_worker_id": {
+                    "type": "string"
+                  },
                   "status": {
                     "type": "string"
                   }
@@ -1807,6 +1858,16 @@
     },
     "/api/web/payroll": {
       "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "period_month",
+            "schema": {
+              "pattern": "^\\d{4}-\\d{2}$",
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful operation; see docs/API.md for payloads"
@@ -1882,6 +1943,56 @@
           }
         ],
         "summary": "POST /api/web/payroll"
+      }
+    },
+    "/api/web/payroll/batch": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "period_end": {
+                    "type": "string"
+                  },
+                  "period_start": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "period_start",
+                  "period_end"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful operation; see docs/API.md for payloads"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Unverified, inactive or unknown LINE identity"
+          },
+          "403": {
+            "description": "Role or ownership denied"
+          },
+          "409": {
+            "description": "State conflict"
+          }
+        },
+        "security": [
+          {
+            "lineIDToken": []
+          }
+        ],
+        "summary": "POST /api/web/payroll/batch"
       }
     },
     "/api/web/payroll/preview": {
@@ -1982,9 +2093,33 @@
           {
             "in": "query",
             "name": "month",
-            "required": true,
+            "required": false,
             "schema": {
               "pattern": "^\\d{4}-\\d{2}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "tor_id",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "period_start",
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "period_end",
+            "schema": {
+              "format": "date",
               "type": "string"
             }
           }
@@ -2020,9 +2155,33 @@
           {
             "in": "query",
             "name": "month",
-            "required": true,
+            "required": false,
             "schema": {
               "pattern": "^\\d{4}-\\d{2}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "tor_id",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "period_start",
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "period_end",
+            "schema": {
+              "format": "date",
               "type": "string"
             }
           }
@@ -2050,6 +2209,130 @@
           }
         ],
         "summary": "GET /api/web/reports/profit.csv"
+      }
+    },
+    "/api/web/reports/profit.pdf": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "month",
+            "required": false,
+            "schema": {
+              "pattern": "^\\d{4}-\\d{2}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "tor_id",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "period_start",
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "period_end",
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Financial PDF with TOR identifiers and amounts"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Unverified, inactive or unknown LINE identity"
+          },
+          "403": {
+            "description": "Role or ownership denied"
+          },
+          "409": {
+            "description": "State conflict"
+          }
+        },
+        "security": [
+          {
+            "lineIDToken": []
+          }
+        ],
+        "summary": "GET /api/web/reports/profit.pdf"
+      }
+    },
+    "/api/web/reports/profit/confirm": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "period_end": {
+                    "type": "string"
+                  },
+                  "period_start": {
+                    "type": "string"
+                  },
+                  "tor_id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "tor_id",
+                  "period_start",
+                  "period_end"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful operation; see docs/API.md for payloads"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Unverified, inactive or unknown LINE identity"
+          },
+          "403": {
+            "description": "Role or ownership denied"
+          },
+          "409": {
+            "description": "State conflict"
+          }
+        },
+        "security": [
+          {
+            "lineIDToken": []
+          }
+        ],
+        "summary": "POST /api/web/reports/profit/confirm"
       }
     },
     "/api/web/requisitions": {
@@ -2117,6 +2400,173 @@
         "summary": "GET /api/web/requisitions/{id}"
       }
     },
+    "/api/web/requisitions/{id}/decision": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "decision": {
+                    "type": "string"
+                  },
+                  "reason": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "decision",
+                  "reason"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful operation; see docs/API.md for payloads"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Unverified, inactive or unknown LINE identity"
+          },
+          "403": {
+            "description": "Role or ownership denied"
+          },
+          "409": {
+            "description": "State conflict"
+          }
+        },
+        "security": [
+          {
+            "lineIDToken": []
+          }
+        ],
+        "summary": "POST /api/web/requisitions/{id}/decision"
+      }
+    },
+    "/api/web/requisitions/{id}/deliveries": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation; see docs/API.md for payloads"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Unverified, inactive or unknown LINE identity"
+          },
+          "403": {
+            "description": "Role or ownership denied"
+          },
+          "409": {
+            "description": "State conflict"
+          }
+        },
+        "security": [
+          {
+            "lineIDToken": []
+          }
+        ],
+        "summary": "GET /api/web/requisitions/{id}/deliveries"
+      }
+    },
+    "/api/web/requisitions/{id}/delivery": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "description": {
+                    "type": "string"
+                  },
+                  "photo_paths": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "schedule_id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "schedule_id",
+                  "description",
+                  "photo_paths"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful operation; see docs/API.md for payloads"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Unverified, inactive or unknown LINE identity"
+          },
+          "403": {
+            "description": "Role or ownership denied"
+          },
+          "409": {
+            "description": "State conflict"
+          }
+        },
+        "security": [
+          {
+            "lineIDToken": []
+          }
+        ],
+        "summary": "POST /api/web/requisitions/{id}/delivery"
+      }
+    },
     "/api/web/requisitions/{id}/fund-transfers": {
       "post": {
         "parameters": [
@@ -2182,6 +2632,44 @@
         "summary": "POST /api/web/requisitions/{id}/fund-transfers"
       }
     },
+    "/api/web/requisitions/{id}/inspection": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation; see docs/API.md for payloads"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Unverified, inactive or unknown LINE identity"
+          },
+          "403": {
+            "description": "Role or ownership denied"
+          },
+          "409": {
+            "description": "State conflict"
+          }
+        },
+        "security": [
+          {
+            "lineIDToken": []
+          }
+        ],
+        "summary": "GET /api/web/requisitions/{id}/inspection"
+      }
+    },
     "/api/web/requisitions/{id}/purchase": {
       "post": {
         "parameters": [
@@ -2211,6 +2699,10 @@
                         "actual_qty": {
                           "type": "integer"
                         },
+                        "expected_actual_qty": {
+                          "nullable": false,
+                          "type": "integer"
+                        },
                         "item_id": {
                           "type": "string"
                         }
@@ -2218,7 +2710,8 @@
                       "required": [
                         "item_id",
                         "actual_qty",
-                        "actual_price"
+                        "actual_price",
+                        "expected_actual_qty"
                       ],
                       "type": "object"
                     },
@@ -2229,8 +2722,7 @@
                   }
                 },
                 "required": [
-                  "items",
-                  "receipt_path"
+                  "items"
                 ],
                 "type": "object"
               }

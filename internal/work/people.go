@@ -141,58 +141,7 @@ func (s *Service) Schedule(ctx context.Context, in ScheduleInput) ([]string, err
 		}
 		seen[id] = true
 	}
-	var out []string
-	e := s.Repo.Transaction(ctx, func(q Query) error {
-		if e := lock(ctx, q, "staffing:"+in.AssignmentID+":"+in.WorkDate); e != nil {
-			return e
-		}
-		var capacity int
-		var start, end string
-		var state string
-		if e := s.Repo.Row(ctx, q, query48, in.AssignmentID).Scan(&capacity, &start, &end, &state); e != nil {
-			return e
-		}
-		if state == "cancelled" || state == "complete" || in.WorkDate < start || in.WorkDate > end {
-			return conflict("outside contract dates or contract closed")
-		}
-		var count int
-		if e := s.Repo.Row(ctx, q, query49, in.AssignmentID, in.WorkDate).Scan(&count); e != nil {
-			return e
-		}
-		if count+len(in.WorkerIDs) > capacity {
-			return conflict("required_workers exceeded")
-		}
-		for _, worker := range in.WorkerIDs {
-			var user string
-			var available, active bool
-			if e := s.Repo.Row(ctx, q, query50, worker).Scan(&user, &available, &active); e != nil {
-				return e
-			}
-			id, e := s.Worker(ctx, q, user)
-			if e != nil {
-				return e
-			}
-			if id != worker || !available || !active {
-				return conflict("worker unavailable")
-			}
-			if e = lock(ctx, q, "payroll:"+user); e != nil {
-				return e
-			}
-			var paidPeriod bool
-			if e = s.Repo.Row(ctx, q, query51, user, in.WorkDate).Scan(&paidPeriod); e != nil {
-				return e
-			}
-			if paidPeriod {
-				return conflict("cannot change staffing in a calculated payroll period")
-			}
-			var newID string
-			if e = s.Repo.Row(ctx, q, query52, in.AssignmentID, worker, in.WorkDate, in.Start).Scan(&newID); e != nil {
-				return e
-			}
-			out = append(out, newID)
-		}
-		return nil
-	})
+	out, e := s.scheduleTransaction(ctx, in)
 	if e == nil {
 		for _, id := range out {
 			s.Event("schedule", id)
@@ -205,7 +154,7 @@ func (s *Service) Schedules(ctx context.Context, p auth.Principal, limit, offset
 	if p.Role == auth.RoleWorker {
 		owner = p.UserID
 	}
-	return s.Repo.List(ctx, s.Repo.Pool, query53, owner, limit, offset)
+	return s.Repo.List(ctx, s.Repo.Pool, query53, owner, limit, offset, s.Now().In(Bangkok).Format("2006-01-02"))
 }
 
 type LeaveInput struct {
@@ -244,10 +193,12 @@ func (s *Service) Leave(ctx context.Context, p auth.Principal, in LeaveInput) (s
 		if e != nil {
 			return e
 		}
-		if start.Sub(s.Now()) < 24*60*60*1000000000 {
-			return invalid("leave_date", "at least 24 hours notice required")
+		_ = start
+		today := s.Now().In(Bangkok).Format("2006-01-02")
+		if in.Date < today {
+			return invalid("leave_date", "past dates cannot be requested")
 		}
-		return s.Repo.Row(ctx, q, query56, document("LEAVE"), p.UserID, in.Date, in.Reason).Scan(&id)
+		return s.Repo.Row(ctx, q, query56, document("LEAVE"), p.UserID, in.Date, in.Reason, in.Date > today).Scan(&id)
 	})
 	if e == nil {
 		s.Event("leave", id)
@@ -268,51 +219,7 @@ func (s *Service) ReviewLeave(ctx context.Context, id, state string) error {
 	if state != "approved" && state != "rejected" {
 		return invalid("status", "approved or rejected required")
 	}
-	err := s.Repo.Transaction(ctx, func(q Query) error {
-		var user, date string
-		if e := s.Repo.Row(ctx, q, query58, id).Scan(&user, &date); e != nil {
-			return e
-		}
-		worker, e := s.Worker(ctx, q, user)
-		if e != nil {
-			return e
-		}
-		if e = lock(ctx, q, "payroll:"+user); e != nil {
-			return e
-		}
-		var calculated bool
-		if e = s.Repo.Row(ctx, q, query59, user, date).Scan(&calculated); e != nil {
-			return e
-		}
-		if calculated {
-			return conflict("leave period already calculated")
-		}
-		var schedule string
-		if e = s.Repo.Row(ctx, q, query60, worker, date).Scan(&schedule); e != nil {
-			return e
-		}
-		if state == "approved" {
-			var checked bool
-			if e = s.Repo.Row(ctx, q, query61, schedule).Scan(&checked); e != nil {
-				return e
-			}
-			if checked {
-				return conflict("cannot approve leave after check-in")
-			}
-		}
-		tag, e := s.Repo.Exec(ctx, q, query62, id, state)
-		if e != nil {
-			return e
-		}
-		if tag.RowsAffected() != 1 {
-			return conflict("leave already reviewed")
-		}
-		if state == "approved" {
-			_, e = s.Repo.Exec(ctx, q, query63, schedule, worker, date)
-			return e
-		}
-		return nil
-	})
+	err := s.Repo.Transaction(ctx, func(q Query) error { return s.reviewLeave(ctx, q, id, state) })
 	if err == nil {
 		s.Event("leave_review", id)
 	}
@@ -344,4 +251,117 @@ func (s *Service) Replacement(ctx context.Context, leaveID, workerID string) ([]
 	}
 	in.WorkerIDs = []string{workerID}
 	return s.Schedule(ctx, in)
+}
+
+func (s *Service) scheduleTransaction(ctx context.Context, in ScheduleInput) (out []string, err error) {
+	err = s.Repo.Transaction(ctx, func(q Query) error { var e error; out, e = s.schedule(ctx, q, in); return e })
+	return
+}
+func (s *Service) schedule(ctx context.Context, q Query, in ScheduleInput) ([]string, error) {
+	var out []string
+
+	if e := lock(ctx, q, "staffing:"+in.AssignmentID+":"+in.WorkDate); e != nil {
+		return nil, e
+	}
+	var capacity int
+	var start, end string
+	var state string
+	if e := s.Repo.Row(ctx, q, query48, in.AssignmentID).Scan(&capacity, &start, &end, &state); e != nil {
+		return nil, e
+	}
+	if state != "active" || in.WorkDate < start || in.WorkDate > end {
+		return nil, conflict("outside contract dates or contract closed")
+	}
+	var count int
+	if e := s.Repo.Row(ctx, q, query49, in.AssignmentID, in.WorkDate).Scan(&count); e != nil {
+		return nil, e
+	}
+	if count+len(in.WorkerIDs) < capacity {
+		return nil, conflict("minimum required_workers not met")
+	}
+	var ready bool
+	if e := q.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM equipment_requisition WHERE assignment_id=$1 AND requisition_type='tor_base') AND NOT EXISTS(SELECT 1 FROM equipment_requisition WHERE assignment_id=$1 AND requisition_type='tor_base' AND status<>'completed')`, in.AssignmentID).Scan(&ready); e != nil {
+		return nil, e
+	}
+	if !ready {
+		return nil, conflict("initial TOR equipment is not ready")
+	}
+	for _, worker := range in.WorkerIDs {
+		var user string
+		var available, active bool
+		if e := s.Repo.Row(ctx, q, query50, worker).Scan(&user, &available, &active); e != nil {
+			return nil, e
+		}
+		id, e := s.Worker(ctx, q, user)
+		if e != nil {
+			return nil, e
+		}
+		if id != worker || !available || !active {
+			return nil, conflict("worker unavailable")
+		}
+		if e = lock(ctx, q, "payroll:"+user); e != nil {
+			return nil, e
+		}
+		var paidPeriod bool
+		if e = s.Repo.Row(ctx, q, query51, user, in.WorkDate).Scan(&paidPeriod); e != nil {
+			return nil, e
+		}
+		if paidPeriod {
+			return nil, conflict("cannot change staffing in a calculated payroll period")
+		}
+		var newID string
+		if e = s.Repo.Row(ctx, q, query52, in.AssignmentID, worker, in.WorkDate, in.Start).Scan(&newID); e != nil {
+			return nil, e
+		}
+		out = append(out, newID)
+	}
+	return out, nil
+}
+
+func (s *Service) reviewLeave(ctx context.Context, q Query, id, state string) error {
+
+	var user, date string
+	var advance bool
+	if e := s.Repo.Row(ctx, q, query58, id).Scan(&user, &date, &advance); e != nil {
+		return e
+	}
+	worker, e := s.Worker(ctx, q, user)
+	if e != nil {
+		return e
+	}
+	if e = lock(ctx, q, "payroll:"+user); e != nil {
+		return e
+	}
+	var calculated bool
+	if e = s.Repo.Row(ctx, q, query59, user, date).Scan(&calculated); e != nil {
+		return e
+	}
+	if calculated {
+		return conflict("leave period already calculated")
+	}
+	var schedule string
+	if e = s.Repo.Row(ctx, q, query60, worker, date).Scan(&schedule); e != nil {
+		return e
+	}
+	if state == "approved" {
+		var checked bool
+		if e = s.Repo.Row(ctx, q, query61, schedule).Scan(&checked); e != nil {
+			return e
+		}
+		if checked {
+			return conflict("cannot approve leave after check-in")
+		}
+	}
+	tag, e := s.Repo.Exec(ctx, q, query62, id, state)
+	if e != nil {
+		return e
+	}
+	if tag.RowsAffected() != 1 {
+		return conflict("leave already reviewed")
+	}
+	if state == "approved" && advance {
+		_, e = s.Repo.Exec(ctx, q, query63, schedule, worker, date)
+		return e
+	}
+	return nil
 }

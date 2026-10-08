@@ -89,6 +89,9 @@ func TestIntegrationMVP(t *testing.T) {
 	if e = pool.QueryRow(ctx, `INSERT INTO tor_location_assignment(tor_id,location_id,required_workers) VALUES($1,$2,1) RETURNING assignment_id::text`, tor, loc).Scan(&assignment); e != nil {
 		t.Fatal(e)
 	}
+	if _, e = pool.Exec(ctx, `INSERT INTO equipment_requisition(requisition_no,requested_by,assignment_id,reason,requisition_type,status) VALUES($1,$2,$3,'ready fixture','tor_base','completed')`, uuid.NewString(), sup.UserID, assignment); e != nil {
+		t.Fatal(e)
+	}
 	ids, e := s.Schedule(ctx, ScheduleInput{assignment, []string{w1}, "2026-10-04", "08:00"})
 	if e != nil {
 		t.Fatal(e)
@@ -188,6 +191,18 @@ func TestIntegrationMVP(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
+	now = time.Date(2026, 10, 16, 8, 0, 0, 0, Bangkok)
+	open, e := s.Schedule(ctx, ScheduleInput{assignment, []string{w2}, "2026-10-16", "08:00"})
+	if e != nil {
+		t.Fatal(e)
+	}
+	qr, e = s.QR(ctx, assignment)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if e = s.CheckIn(ctx, replacement, CheckIn{ScheduleID: open[0], Latitude: &lat, Longitude: &lon, Accuracy: &accuracy, QR: qr["qr_token"].(string)}); e != nil {
+		t.Fatal(e)
+	}
 	req, e := s.Requisition(ctx, replacement, RequestInput{assignment, "extra", []RequestItem{{equipment, 2, "test"}}})
 	if e != nil {
 		t.Fatal(e)
@@ -196,7 +211,7 @@ func TestIntegrationMVP(t *testing.T) {
 	if e = pool.QueryRow(ctx, `SELECT item_id::text FROM requisition_item WHERE requisition_id=$1`, req).Scan(&item); e != nil {
 		t.Fatal(e)
 	}
-	if e = s.Survey(ctx, req, []SurveyItem{{item, 0}}); e != nil {
+	if e = s.DecideRequest(ctx, sup, req, ProcurementDecision{"purchase", "needed"}); e != nil {
 		t.Fatal(e)
 	}
 	if e = s.ReviewRequest(ctx, sup, req, ReviewInput{"approve", ""}); e != nil {
@@ -215,7 +230,8 @@ func TestIntegrationMVP(t *testing.T) {
 	if _, e = s.Fund(ctx, sup, req, fund); e == nil {
 		t.Fatal("fund retry payload changed")
 	}
-	purchase := PurchaseInput{[]PurchaseItem{{item, 2, "50"}}, replacement.UserID.String() + "/" + uuid.NewString()}
+	zero := 0
+	purchase := PurchaseInput{[]PurchaseItem{{item, 2, "50", &zero}}, replacement.UserID.String() + "/" + uuid.NewString()}
 	if _, e = s.Purchase(ctx, replacement, req, purchase); e != nil {
 		t.Fatal(e)
 	}

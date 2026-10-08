@@ -20,4 +20,10 @@ Integration requires TEST_DATABASE_URL and TEST_DATABASE_ISOLATED=yes pointing a
 
 Absent finalization runs each minute after shift end +2h. Payroll is an explicit Supervisor action after period/cutoff closure. No automatic payments occur.
 
-Current schema lacks durable outbox, delivery history, payment timestamp/reference and historical wage/correction audit. TOR payroll allocation uses actual workdays and is estimated. PDF export and live integration remain planned.
+Current schema lacks durable outbox, dedicated delivery history, payment timestamp/reference and historical wage/correction audit. Delivery evidence is supported through WORK_EVIDENCE descriptions. TOR payroll allocation uses actual workdays and is estimated. Basic PDF financial export is implemented; live integration remains unverified.
+
+## Latest Use Case Description behavior
+
+Business authority is SA-Group5 Use Case Description; physical schema remains exported Supabase metadata. See docs/REQUIREMENTS.md, docs/API.md and docs/TASKS.md. Backend only; unchanged database. Assistant reviews leave (same-day emergency supported), procurement can span rounds, delivery is recorded in existing work_evidence, payroll supports atomic batches and profit includes paid payroll only. Historical migrations must not run on Supabase. Never inspect .env. Integration requires isolated loopback PostgreSQL, not the shared Supabase project.
+
+API changes include expected_actual_qty on each purchase item and Assistant ownership of leave review. Financial closing confirmation is a snapshot (persisted=false). Notifications have no durable outbox. PDF financial export uses TOR identifiers/English fields; Thai names remain in JSON/CSV.

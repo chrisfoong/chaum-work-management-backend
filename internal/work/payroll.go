@@ -129,45 +129,7 @@ func (s *Service) Payroll(ctx context.Context, p auth.Principal, in PayrollInput
 		return "", conflict("payroll period has not closed")
 	}
 	var id string
-	e := s.Repo.Transaction(ctx, func(q Query) error {
-		if e := lock(ctx, q, "payroll:"+in.UserID); e != nil {
-			return e
-		}
-		var overlapping bool
-		if e := s.Repo.Row(ctx, q, query31, in.UserID, in.Start, in.End).Scan(&overlapping); e != nil {
-			return e
-		}
-		if overlapping {
-			return conflict("payroll period overlaps an existing slip")
-		}
-		out, e := s.preview(ctx, q, in, true)
-		if e != nil {
-			return e
-		}
-		if !out.AttendanceComplete {
-			return conflict("finalize attendance before payroll")
-		}
-		if e = s.Repo.Row(ctx, q, query32, document("PAY"), in.UserID, p.UserID, in.Start, in.End, out.Base, out.Applied, out.Net).Scan(&id); e != nil {
-			return e
-		}
-		worker, e := s.Worker(ctx, q, in.UserID)
-		if e != nil {
-			return e
-		}
-		for _, d := range out.Deductions {
-			var count int
-			if e = s.Repo.Row(ctx, q, query33, d.AttendanceID).Scan(&count); e != nil {
-				return e
-			}
-			if count != 0 {
-				return conflict("attendance already has a penalty ledger entry")
-			}
-			if _, e = s.Repo.Exec(ctx, q, query34, worker, d.AttendanceID, id, d.Penalty, d.Reason); e != nil {
-				return e
-			}
-		}
-		return nil
-	})
+	e := s.Repo.Transaction(ctx, func(q Query) error { var e error; id, e = s.createPayroll(ctx, q, p, in); return e })
 	if e == nil {
 		s.Event("payroll", id)
 	}
@@ -262,4 +224,46 @@ func (s *Service) Receive(ctx context.Context, id, amount string) error {
 		_, e := s.Repo.Exec(ctx, q, query40, id, Decimal(c))
 		return e
 	})
+}
+
+func (s *Service) createPayroll(ctx context.Context, q Query, p auth.Principal, in PayrollInput) (string, error) {
+	var id string
+
+	if e := lock(ctx, q, "payroll:"+in.UserID); e != nil {
+		return "", e
+	}
+	var overlapping bool
+	if e := s.Repo.Row(ctx, q, query31, in.UserID, in.Start, in.End).Scan(&overlapping); e != nil {
+		return "", e
+	}
+	if overlapping {
+		return "", conflict("payroll period overlaps an existing slip")
+	}
+	out, e := s.preview(ctx, q, in, true)
+	if e != nil {
+		return "", e
+	}
+	if !out.AttendanceComplete {
+		return "", conflict("finalize attendance before payroll")
+	}
+	if e = s.Repo.Row(ctx, q, query32, document("PAY"), in.UserID, p.UserID, in.Start, in.End, out.Base, out.Applied, out.Net).Scan(&id); e != nil {
+		return "", e
+	}
+	worker, e := s.Worker(ctx, q, in.UserID)
+	if e != nil {
+		return "", e
+	}
+	for _, d := range out.Deductions {
+		var count int
+		if e = s.Repo.Row(ctx, q, query33, d.AttendanceID).Scan(&count); e != nil {
+			return "", e
+		}
+		if count != 0 {
+			return "", conflict("attendance already has a penalty ledger entry")
+		}
+		if _, e = s.Repo.Exec(ctx, q, query34, worker, d.AttendanceID, id, d.Penalty, d.Reason); e != nil {
+			return "", e
+		}
+	}
+	return id, nil
 }

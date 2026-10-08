@@ -81,8 +81,9 @@ func Register(web, worker *gin.RouterGroup, s *Service) {
 		ids, e := s.Schedule(c.Request.Context(), in)
 		return gin.H{"schedule_ids": ids}, e
 	}))
-	sup.POST("/leave-requests/:id/review", input(func(c *gin.Context, _ auth.Principal, in stateInput) (any, error) {
-		return nil, s.ReviewLeave(c.Request.Context(), c.Param("id"), in.Status)
+	asst.POST("/leave-requests/:id/review", input(func(c *gin.Context, _ auth.Principal, in LeaveReviewInput) (any, error) {
+		ids, e := s.ReviewLeaveAndReplace(c.Request.Context(), c.Param("id"), in)
+		return gin.H{"schedule_ids": ids}, e
 	}))
 	asst.POST("/leave-requests/:id/replacement", input(func(c *gin.Context, _ auth.Principal, in replacementInput) (any, error) {
 		ids, e := s.Replacement(c.Request.Context(), c.Param("id"), in.WorkerID)
@@ -118,6 +119,25 @@ func Register(web, worker *gin.RouterGroup, s *Service) {
 		id, e := s.Purchase(c.Request.Context(), p, c.Param("id"), in)
 		return gin.H{"expense_id": id}, e
 	}))
+	asst.GET("/requisitions/:id/inspection", func(c *gin.Context) {
+		out, e := s.InspectRequest(c.Request.Context(), c.Param("id"))
+		respond(c, out, e)
+	})
+	asst.POST("/requisitions/:id/decision", input(func(c *gin.Context, p auth.Principal, in ProcurementDecision) (any, error) {
+		return nil, s.DecideRequest(c.Request.Context(), p, c.Param("id"), in)
+	}))
+	asst.POST("/requisitions/:id/delivery", input(func(c *gin.Context, p auth.Principal, in DeliveryInput) (any, error) {
+		return nil, s.Deliver(c.Request.Context(), p, c.Param("id"), in)
+	}))
+	asst.GET("/requisitions/:id/deliveries", func(c *gin.Context) { out, e := s.Deliveries(c.Request.Context(), c.Param("id")); respond(c, out, e) })
+	asst.GET("/contracts/:id/continuation", func(c *gin.Context) { out, e := s.Continuation(c.Request.Context(), c.Param("id")); respond(c, out, e) })
+	sup.POST("/payroll/batch", input(func(c *gin.Context, p auth.Principal, in PayrollBatchInput) (any, error) {
+		return s.PayrollBatch(c.Request.Context(), p, in)
+	}))
+	sup.POST("/reports/profit/confirm", input(func(c *gin.Context, _ auth.Principal, in ProfitConfirmation) (any, error) {
+		return s.CloseSummary(c.Request.Context(), in.TorID, in.Start, in.End)
+	}))
+	sup.GET("/reports/profit.pdf", s.ExportProfitPDF)
 	sup.POST("/payroll/preview", input(func(c *gin.Context, _ auth.Principal, in PayrollInput) (any, error) {
 		return s.PreviewPayroll(c.Request.Context(), in)
 	}))
@@ -125,8 +145,8 @@ func Register(web, worker *gin.RouterGroup, s *Service) {
 		id, e := s.Payroll(c.Request.Context(), p, in)
 		return gin.H{"payroll_id": id}, e
 	}))
-	sup.GET("/payroll", list(s.Payrolls))
-	worker.GET("/payroll", list(s.Payrolls))
+	sup.GET("/payroll", payrollList(s))
+	worker.GET("/payroll", payrollList(s))
 	sup.POST("/payroll/:id/mark-paid", func(c *gin.Context) { respond(c, nil, s.Pay(c.Request.Context(), c.Param("id"))) })
 	sup.POST("/invoices", input(func(c *gin.Context, _ auth.Principal, in InvoiceInput) (any, error) {
 		id, e := s.Invoice(c.Request.Context(), in)
@@ -139,7 +159,7 @@ func Register(web, worker *gin.RouterGroup, s *Service) {
 		return nil, s.Receive(c.Request.Context(), c.Param("id"), in.Amount)
 	}))
 	sup.GET("/reports/profit", func(c *gin.Context) {
-		out, e := s.Profit(c.Request.Context(), c.Query("month"))
+		out, e := s.profitRequest(c)
 		respond(c, gin.H{"data": out}, e)
 	})
 	sup.GET("/reports/profit.csv", s.ExportProfit)
