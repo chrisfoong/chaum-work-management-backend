@@ -21,7 +21,7 @@ func (s *Service) Requisition(ctx context.Context, p auth.Principal, in RequestI
 	if e := validID(in.AssignmentID, "assignment_id"); e != nil {
 		return "", e
 	}
-	if e := text(in.Reason, "reason", 1000); e != nil {
+	if e := text(in.Reason, "reason", 500); e != nil {
 		return "", e
 	}
 	if len(in.Items) == 0 || len(in.Items) > 100 {
@@ -255,7 +255,29 @@ type PurchaseInput struct {
 	Receipt string         `json:"receipt_path"`
 }
 
+type PurchaseReviewItem struct {
+	ItemID         string `json:"item_id"`
+	ActualQuantity int    `json:"new_actual_qty"`
+	Remaining      int    `json:"remaining_qty"`
+	UnitPrice      string `json:"new_actual_price"`
+	Cost           string `json:"round_cost"`
+}
+type PurchaseReview struct {
+	Items      []PurchaseReviewItem `json:"items"`
+	Total      string               `json:"round_total"`
+	NextStatus string               `json:"next_status"`
+	Persisted  bool                 `json:"persisted"`
+}
+
+func (s *Service) PreviewPurchase(ctx context.Context, p auth.Principal, id string, in PurchaseInput) (PurchaseReview, error) {
+	out := PurchaseReview{Items: []PurchaseReviewItem{}}
+	_, e := s.executePurchase(ctx, p, id, in, &out)
+	return out, e
+}
 func (s *Service) Purchase(ctx context.Context, p auth.Principal, id string, in PurchaseInput) (string, error) {
+	return s.executePurchase(ctx, p, id, in, nil)
+}
+func (s *Service) executePurchase(ctx context.Context, p auth.Principal, id string, in PurchaseInput, review *PurchaseReview) (string, error) {
 	if e := validID(id, "requisition_id"); e != nil {
 		return "", e
 	}
@@ -287,9 +309,6 @@ func (s *Service) Purchase(ctx context.Context, p auth.Principal, id string, in 
 			return "", invalid("expected_actual_qty", "current cumulative quantity required to prevent replay")
 		}
 	}
-	if !positive {
-		return "", invalid("items", "at least one positive quantity required")
-	}
 	if total > 9999999999 {
 		return "", invalid("amount", "total exceeds NUMERIC(10,2)")
 	}
@@ -309,12 +328,8 @@ func (s *Service) Purchase(ctx context.Context, p auth.Principal, id string, in 
 			return conflict("request is not ready for procurement")
 		}
 		if kind == "additional" {
-			var funded bool
-			if e := q.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM expense_claim WHERE requisition_id=$1 AND expense_type='fund_transfer')`, id).Scan(&funded); e != nil {
-				return e
-			}
-			if !funded {
-				return conflict("additional purchase requires Supervisor funding")
+			if !positive {
+				return invalid("items", "additional purchases require at least one positive quantity")
 			}
 		}
 		if kind == "additional" && total > 0 {
@@ -335,6 +350,23 @@ func (s *Service) Purchase(ctx context.Context, p auth.Principal, id string, in 
 			if it.Quantity > buy-actual {
 				return invalid("actual_qty", "quantity exceeds remaining requirement")
 			}
+			if review != nil {
+				price, e := Money(oldPrice)
+				if e != nil {
+					return conflict("invalid stored unit price")
+				}
+				newQty := actual + it.Quantity
+				if it.Quantity > 0 {
+					price = prices[it.ItemID]
+					if kind == "additional" {
+						previous, _ := Money(oldPrice)
+						numerator := previous*int64(actual) + price*int64(it.Quantity)
+						price = (numerator + int64(newQty)/2) / int64(newQty)
+					}
+				}
+				review.Items = append(review.Items, PurchaseReviewItem{it.ItemID, newQty, buy - newQty, Decimal(price), Decimal(prices[it.ItemID] * int64(it.Quantity))})
+				continue
+			}
 			if it.Quantity == 0 {
 				continue
 			}
@@ -353,9 +385,42 @@ func (s *Service) Purchase(ctx context.Context, p auth.Principal, id string, in 
 			if used {
 				return conflict("receipt already used for a purchase")
 			}
-			if e := s.Repo.Row(ctx, q, query84, document("EXP"), p.UserID, id, Decimal(total), in.Receipt).Scan(&expense); e != nil {
+			if review == nil {
+				if e := s.Repo.Row(ctx, q, query84, document("EXP"), p.UserID, id, Decimal(total), in.Receipt).Scan(&expense); e != nil {
+					return e
+				}
+			}
+		}
+		if review != nil {
+			quantities := map[string]int{}
+			for _, it := range in.Items {
+				quantities[it.ItemID] = it.Quantity
+			}
+			rows, e := q.Query(ctx, `SELECT item_id::text,to_buy_qty,COALESCE(actual_qty,0) FROM requisition_item WHERE requisition_id=$1`, id)
+			if e != nil {
 				return e
 			}
+			missing := false
+			for rows.Next() {
+				var item string
+				var buy, actual int
+				if e = rows.Scan(&item, &buy, &actual); e != nil {
+					rows.Close()
+					return e
+				}
+				missing = missing || actual+quantities[item] < buy
+			}
+			e = rows.Err()
+			rows.Close()
+			if e != nil {
+				return e
+			}
+			review.Total = Decimal(total)
+			review.NextStatus = "completed"
+			if missing {
+				review.NextStatus = "pending_fund"
+			}
+			return nil
 		}
 		var missing bool
 		if e := s.Repo.Row(ctx, q, query85, id).Scan(&missing); e != nil {

@@ -220,21 +220,36 @@ func (s *Service) evidence(ctx context.Context, p auth.Principal, path string) e
 	}
 	return s.Files.Verify(ctx, p, path)
 }
-func (s *Service) notify(ctx context.Context, user, msg string) {
+func (s *Service) notify(ctx context.Context, user, msg string) bool {
+	return s.notifyKey(ctx, user, msg, "")
+}
+func (s *Service) notifyKey(ctx context.Context, user, msg, event string) bool {
 	if s.Notify == nil {
-		return
+		return false
 	}
 	var line string
 	if s.Repo.Pool.QueryRow(ctx, `SELECT line_id FROM public."USER" WHERE user_id=$1 AND is_active`, user).Scan(&line) != nil {
-		return
+		return false
 	}
-	for _, part := range notificationParts(msg) {
-		if e := s.Notify.Send(ctx, line, part); e != nil {
+	accepted := true
+	for index, part := range notificationParts(msg) {
+		var e error
+		if keyed, ok := s.Notify.(interface {
+			SendKey(context.Context, string, string, string) error
+		}); ok && event != "" {
+			key := uuid.NewSHA1(uuid.NameSpaceURL, []byte(event+":"+line+":"+strconv.Itoa(index)+":"+part)).String()
+			e = keyed.SendKey(ctx, line, part, key)
+		} else {
+			e = s.Notify.Send(ctx, line, part)
+		}
+		if e != nil {
+			accepted = false
 			slog.Warn("notification failed")
 		} else {
 			slog.Info("notification accepted by LINE; recipient delivery unverified")
 		}
 	}
+	return accepted
 }
 
 func isMissing(e error) bool { return errors.Is(e, pgx.ErrNoRows) }

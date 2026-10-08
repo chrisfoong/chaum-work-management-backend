@@ -35,3 +35,5 @@ Supabase remains the application database. Added private PNG contract confirmati
 ## Automated and live acceptance
 
 GitHub Actions in .github/workflows/backend.yml runs the full isolated PostgreSQL17 suite and rejects skipped tests. No Supabase secrets are used. See [backend acceptance](docs/BACKEND_ACCEPTANCE.md) for Web/Worker login diagnosis, configuration ownership and pending live checks. Historical shared evidence reports Supervisor login success; Worker/QR/Storage/message delivery remain separately unverified.
+
+Use Case completeness and exact Backend function/API mapping: [docs/USECASE_AUDIT.md](docs/USECASE_AUDIT.md). Latest audit adds notification-only resend/status, selected-area continuation, schedule address/status, accurate 2A/7A prerequisites and financial detail arrays. Tests are local/isolated; deployed LINE/Storage/QR integration and persistent summary-notification history remain unverified or unavailable.

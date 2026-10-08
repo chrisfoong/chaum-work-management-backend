@@ -72,7 +72,9 @@ func requestModels() map[string]any {
 		"POST /api/web/schedules": work.ScheduleInput{}, "POST /api/liff/leave-requests": work.LeaveInput{}, "POST /api/web/leave-requests/{id}/review": work.LeaveReviewInput{}, "POST /api/web/leave-requests/{id}/replacement": replacement,
 		"POST /api/liff/attendance/check-in": work.CheckIn{}, "POST /api/liff/attendance/check-out": work.CheckOut{}, "POST /api/liff/requisitions": work.RequestInput{}, "POST /api/web/requisitions/{id}/survey": survey, "POST /api/web/requisitions/{id}/review": review, "POST /api/web/requisitions/{id}/fund-transfers": work.FundInput{}, "POST /api/web/requisitions/{id}/purchase": work.PurchaseInput{},
 		"POST /api/web/payroll/preview": work.PayrollInput{}, "POST /api/web/payroll": work.PayrollInput{}, "POST /api/web/invoices": work.InvoiceInput{}, "POST /api/web/invoices/{id}/mark-paid": paid,
-		"POST /api/web/payroll/batch": work.PayrollBatchInput{}, "POST /api/web/requisitions/{id}/decision": work.ProcurementDecision{}, "POST /api/web/requisitions/{id}/delivery": work.DeliveryInput{}, "POST /api/web/reports/profit/confirm": work.ProfitConfirmation{},
+		"POST /api/web/requisitions/{id}/purchase/preview": work.PurchaseInput{},
+		"POST /api/web/notifications/{id}/retry":           work.NotificationInput{},
+		"POST /api/web/payroll/batch":                      work.PayrollBatchInput{}, "POST /api/web/requisitions/{id}/decision": work.ProcurementDecision{}, "POST /api/web/requisitions/{id}/delivery": work.DeliveryInput{}, "POST /api/web/reports/profit/confirm": work.ProfitConfirmation{},
 	}
 }
 func describeRequest(method, path string, op map[string]any) {

@@ -72,7 +72,7 @@ func (s *Service) InspectRequest(ctx context.Context, id string) (json.RawMessag
  COALESCE((SELECT jsonb_agg(jsonb_build_object('item_id',i.item_id,'equipment_id',i.equipment_id,'equipment_name',e.equipment_name,'required_qty',i.required_qty,'actual_qty',i.actual_qty,'remaining_qty',GREATEST(i.to_buy_qty-COALESCE(i.actual_qty,0),0))) FROM requisition_item i JOIN equipment e USING(equipment_id) WHERE i.requisition_id=r.requisition_id),'[]'::jsonb) AS requested_items,
  COALESCE((SELECT jsonb_agg(jsonb_build_object('requisition_id',b.requisition_id,'assignment_id',b.assignment_id,'status',b.status,'equipment_id',i.equipment_id,'required_qty',i.required_qty,'existing_qty',i.existing_qty,'actual_qty',i.actual_qty,'remaining_qty',GREATEST(i.to_buy_qty-COALESCE(i.actual_qty,0),0))) FROM equipment_requisition b JOIN tor_location_assignment ba ON ba.assignment_id=b.assignment_id JOIN requisition_item i ON i.requisition_id=b.requisition_id WHERE ba.tor_id=a.tor_id AND b.requisition_type='tor_base' AND i.equipment_id IN (SELECT equipment_id FROM requisition_item WHERE requisition_id=r.requisition_id)),'[]'::jsonb) AS tor_requirements,
  COALESCE((SELECT jsonb_agg(jsonb_build_object('requisition_id',other.requisition_id,'assignment_id',other.assignment_id,'status',other.status,'equipment_id',i.equipment_id,'remaining_qty',GREATEST(i.to_buy_qty-COALESCE(i.actual_qty,0),0))) FROM equipment_requisition other JOIN tor_location_assignment oa ON oa.assignment_id=other.assignment_id JOIN requisition_item i ON i.requisition_id=other.requisition_id WHERE oa.tor_id=a.tor_id AND other.requisition_id<>r.requisition_id AND other.requisition_type='additional' AND other.status NOT IN ('completed','rejected') AND i.equipment_id IN (SELECT equipment_id FROM requisition_item WHERE requisition_id=r.requisition_id)),'[]'::jsonb) AS other_pending_requests
- FROM equipment_requisition r JOIN tor_location_assignment a ON a.assignment_id=r.assignment_id JOIN contract_tor c ON c.tor_id=a.tor_id JOIN location l ON l.location_id=a.location_id WHERE r.requisition_id=$1 AND r.requisition_type='additional'`, id)
+ FROM equipment_requisition r JOIN tor_location_assignment a ON a.assignment_id=r.assignment_id JOIN contract_tor c ON c.tor_id=a.tor_id JOIN location l ON l.location_id=a.location_id WHERE r.requisition_id=$1 AND r.requisition_type='additional' AND r.status='pending_survey'`, id)
 }
 
 type ProcurementDecision struct {
@@ -100,7 +100,7 @@ func (s *Service) DecideRequest(ctx context.Context, p auth.Principal, id string
 			return conflict("only pending additional requests can be decided")
 		}
 		var valid bool
-		if e := q.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM requisition_item WHERE requisition_id=$1) AND NOT EXISTS(SELECT 1 FROM requisition_item i JOIN equipment e USING(equipment_id) WHERE i.requisition_id=$1 AND (i.required_qty<=0 OR NOT e.is_active))`, id).Scan(&valid); e != nil {
+		if e := q.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM requisition_item WHERE requisition_id=$1) AND NOT EXISTS(SELECT 1 FROM requisition_item i JOIN equipment e USING(equipment_id) WHERE i.requisition_id=$1 AND (i.required_qty<=0 OR ($2 AND NOT e.is_active)))`, id, in.Decision == "purchase").Scan(&valid); e != nil {
 			return e
 		}
 		if !valid {
@@ -110,16 +110,9 @@ func (s *Service) DecideRequest(ctx context.Context, p auth.Principal, id string
 		if in.Decision == "no_purchase" {
 			next = "rejected"
 		}
-		_, e := q.Exec(ctx, `UPDATE equipment_requisition SET status=$2::text::requisition_status_enum,reason=CASE WHEN $2::text='pending_approval' THEN reason || E'\n[Purchase decision] ' || $3 ELSE reason END WHERE requisition_id=$1`, id, next, in.Reason)
+		_, e := q.Exec(ctx, `UPDATE equipment_requisition SET status=$2::text::requisition_status_enum,reason=CASE WHEN $2::text='pending_approval' THEN reason || E'\n[Purchase decision] ' || $3 ELSE reason END,reviewed_by=CASE WHEN $2::text='rejected' THEN $4::uuid ELSE reviewed_by END,reviewed_at=CASE WHEN $2::text='rejected' THEN $5::timestamptz ELSE reviewed_at END WHERE requisition_id=$1`, id, next, in.Reason, p.UserID, s.Now())
 		return e
 	})
-	if err == nil {
-		if in.Decision == "no_purchase" {
-			s.notify(ctx, owner, "Chaum: equipment request declined. "+in.Reason)
-		} else {
-			s.Event("approval_needed", id)
-		}
-	}
 	return err
 }
 
@@ -155,7 +148,6 @@ func (s *Service) Deliver(ctx context.Context, p auth.Principal, id string, in D
 			return e
 		}
 	}
-	created := false
 	err := s.Repo.Transaction(ctx, func(q Query) error {
 		var state, kind, assignment, owner, number string
 		if e := q.QueryRow(ctx, `SELECT status::text,requisition_type::text,assignment_id::text,requested_by::text,requisition_no FROM equipment_requisition WHERE requisition_id=$1 FOR UPDATE`, id).Scan(&state, &kind, &assignment, &owner, &number); e != nil {
@@ -221,12 +213,8 @@ func (s *Service) Deliver(ctx context.Context, p auth.Principal, id string, in D
 				return e
 			}
 		}
-		created = true
 		return nil
 	})
-	if err == nil && created {
-		s.Event("delivery", id)
-	}
 	return err
 }
 func (s *Service) Deliveries(ctx context.Context, id string) (json.RawMessage, error) {
@@ -320,6 +308,31 @@ func (s *Service) PayrollBatch(ctx context.Context, p auth.Principal, in Payroll
 			}
 		}
 	}
+	var newSlips []string
+	for _, result := range out {
+		if !result.Existing {
+			newSlips = append(newSlips, result.PayrollID)
+		}
+	}
+	if err == nil && len(newSlips) > 0 {
+		rows, e := s.Repo.Pool.Query(ctx, `SELECT DISTINCT a.tor_id::text FROM payroll p JOIN worker w ON w.user_id=p.user_id JOIN work_schedule sc ON sc.worker_id=w.worker_id JOIN tor_location_assignment a USING(assignment_id) WHERE sc.work_date BETWEEN $1::date AND $2::date AND sc.shift_status<>'cancelled' AND p.payroll_id=ANY($3::uuid[])`, in.Start, in.End, newSlips)
+		if e == nil {
+			var tors []string
+			for rows.Next() {
+				var tor string
+				if rows.Scan(&tor) == nil {
+					tors = append(tors, tor)
+				}
+			}
+			e = rows.Err()
+			rows.Close()
+			if e == nil {
+				for _, tor := range tors {
+					s.Event("continuation", tor)
+				}
+			}
+		}
+	}
 	return out, err
 }
 func (s *Service) PayrollMonth(ctx context.Context, p auth.Principal, month string, limit, offset int) (json.RawMessage, error) {
@@ -397,4 +410,17 @@ func (s *Service) CloseSummary(ctx context.Context, tor, start, end string) (jso
 		ConfirmedAt string          `json:"confirmed_at"`
 		Persisted   bool            `json:"persisted"`
 	}{data, s.Now().Format(time.RFC3339), false})
+}
+
+// AssignmentContinuation is a read model for the area selected in 9A.
+// Notification history cannot be reconstructed from the unchanged schema.
+func (s *Service) AssignmentContinuation(ctx context.Context, id string) (json.RawMessage, error) {
+	if e := validID(id, "assignment_id"); e != nil {
+		return nil, e
+	}
+	return one(ctx, s.Repo.Pool, `SELECT c.tor_id,c.contract_no,c.project_name,c.start_date,c.end_date,c.status,a.assignment_id,a.required_workers,l.location_id,l.location_name,l.address,
+ (c.status='active' AND $2::date BETWEEN c.start_date AND c.end_date) AS can_continue,
+ CASE WHEN c.status='active' AND $2::date BETWEEN c.start_date AND c.end_date THEN '' ELSE 'กรุณาติดต่อผู้ควบคุมงานเพื่อตรวจสอบสัญญาก่อนดำเนินงานต่อ' END AS notice,
+ false AS summary_notification_history_available
+ FROM tor_location_assignment a JOIN contract_tor c USING(tor_id) JOIN location l USING(location_id) WHERE a.assignment_id=$1`, id, s.Now().In(Bangkok).Format("2006-01-02"))
 }

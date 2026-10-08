@@ -14,7 +14,7 @@ const (
 	query50 = `SELECT w.user_id::text,w.is_available,u.is_active FROM worker w JOIN public."USER" u ON u.user_id=w.user_id WHERE w.worker_id=$1 AND u.role='worker' FOR UPDATE OF w`
 	query51 = `SELECT EXISTS(SELECT 1 FROM payroll WHERE user_id=$1 AND $2::date BETWEEN period_start AND period_end)`
 	query52 = `INSERT INTO work_schedule(assignment_id,worker_id,work_date,shift_start_time) VALUES($1,$2,$3::date,$4::time) RETURNING schedule_id::text`
-	query53 = `SELECT ` + frontendScheduleFields + frontendScheduleJoins + ` WHERE ($1::uuid IS NULL OR (w.user_id=$1 AND s.work_date >= $4::date AND s.shift_status='scheduled')) ORDER BY s.work_date ASC,s.shift_start_time,s.schedule_id LIMIT $2 OFFSET $3`
+	query53 = `SELECT ` + frontendScheduleFields + frontendScheduleJoins + ` WHERE ($1::uuid IS NULL OR (w.user_id=$1 AND s.work_date >= $4::date)) ORDER BY s.work_date ASC,s.shift_start_time,s.schedule_id LIMIT $2 OFFSET $3`
 	query54 = `SELECT count(*) FROM leave_request WHERE user_id=$1 AND leave_date=$2::date`
 	query55 = `SELECT shift_start_time::text FROM work_schedule WHERE worker_id=$1 AND work_date=$2::date AND shift_status='scheduled' FOR UPDATE`
 	query56 = `INSERT INTO leave_request(leave_no,user_id,leave_date,reason,is_advance_notice) VALUES($1,$2,$3::date,$4,$5) RETURNING request_id::text`

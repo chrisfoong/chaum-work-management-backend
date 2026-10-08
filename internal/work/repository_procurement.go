@@ -12,13 +12,13 @@ const (
 	query72 = `UPDATE requisition_item SET existing_qty=$3 WHERE requisition_id=$1 AND item_id=$2`
 	query73 = `SELECT EXISTS(SELECT 1 FROM requisition_item WHERE requisition_id=$1 AND to_buy_qty>0)`
 	query74 = `UPDATE equipment_requisition SET status=$2 WHERE requisition_id=$1`
-	query75 = `SELECT status::text FROM equipment_requisition WHERE requisition_id=$1 FOR UPDATE`
+	query75 = `SELECT status::text FROM equipment_requisition WHERE requisition_id=$1 AND requisition_type='additional' FOR UPDATE`
 	query76 = `UPDATE equipment_requisition SET status=$2::text::requisition_status_enum,reviewed_by=$3,reviewed_at=$4,reason=CASE WHEN $2::text='rejected' THEN reason || E'\n[Rejection] ' || $5 ELSE reason END WHERE requisition_id=$1`
 	query77 = `SELECT expense_id::text,requisition_id::text,total_amount::text,receipt_photo_url,user_id::text FROM expense_claim WHERE transfer_ref_no=$1 AND expense_type='fund_transfer'`
 	query78 = `SELECT status::text FROM equipment_requisition WHERE requisition_id=$1 FOR UPDATE`
 	query79 = `INSERT INTO expense_claim(expense_no,expense_type,user_id,requisition_id,total_amount,transfer_ref_no,receipt_photo_url) VALUES($1,'fund_transfer',$2,$3,$4::numeric,$5,$6) RETURNING expense_id::text`
 	query80 = `UPDATE equipment_requisition SET status='pending_procurement' WHERE requisition_id=$1`
-	query81 = `SELECT status::text,requisition_type::text,reviewed_by IS NOT NULL FROM equipment_requisition WHERE requisition_id=$1 FOR UPDATE`
+	query81 = `SELECT status::text,requisition_type::text,reviewed_by IS NOT NULL AND reviewed_at IS NOT NULL FROM equipment_requisition WHERE requisition_id=$1 FOR UPDATE`
 	query82 = `SELECT to_buy_qty,COALESCE(actual_qty,0),COALESCE(actual_price,0)::text FROM requisition_item WHERE item_id=$1 AND requisition_id=$2 FOR UPDATE`
 	query83 = `UPDATE requisition_item SET actual_qty=COALESCE(actual_qty,0)+$2,actual_price=CASE WHEN $4::boolean THEN round((COALESCE(actual_qty,0)*COALESCE(actual_price,0)+$2*$3::numeric)/(COALESCE(actual_qty,0)+$2),2) ELSE $3::numeric END WHERE item_id=$1`
 	query84 = `INSERT INTO expense_claim(expense_no,expense_type,user_id,requisition_id,total_amount,receipt_photo_url) VALUES($1,'actual_expense',$2,$3,$4::numeric,$5) RETURNING expense_id::text`

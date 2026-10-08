@@ -176,20 +176,53 @@ type LinePush struct {
 }
 
 func (l *LinePush) Send(ctx context.Context, user, msg string) error {
+	return l.SendKey(ctx, user, msg, uuid.NewString())
+}
+func (l *LinePush) SendKey(ctx context.Context, user, msg, retryKey string) error {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
 	if l.Token == "" {
 		return conflict("LINE messaging is not configured")
 	}
 	body, _ := json.Marshal(map[string]any{"to": user, "messages": []map[string]string{{"type": "text", "text": msg}}})
-	r, _ := http.NewRequestWithContext(ctx, "POST", "https://api.line.me/v2/bot/message/push", bytes.NewReader(body))
-	r.Header.Set("Authorization", "Bearer "+l.Token)
-	r.Header.Set("Content-Type", "application/json")
-	resp, e := l.Client.Do(r)
-	if e != nil {
-		return fmt.Errorf("LINE push failed")
+	client := l.Client
+	if client == nil {
+		client = &http.Client{Timeout: 5 * time.Second}
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		return fmt.Errorf("LINE push rejected (%d)", resp.StatusCode)
+	// Keep credentials on the LINE origin even if an upstream responds with a redirect.
+	safeClient := *client
+	safeClient.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	for attempt := 0; attempt < 3; attempt++ {
+		if e := ctx.Err(); e != nil {
+			return fmt.Errorf("LINE push cancelled")
+		}
+		r, e := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.line.me/v2/bot/message/push", bytes.NewReader(body))
+		if e != nil {
+			return fmt.Errorf("LINE push unavailable")
+		}
+		r.Header.Set("Authorization", "Bearer "+l.Token)
+		r.Header.Set("Content-Type", "application/json")
+		r.Header.Set("X-Line-Retry-Key", retryKey)
+		resp, e := safeClient.Do(r)
+		if e == nil {
+			io.Copy(io.Discard, io.LimitReader(resp.Body, 4096))
+			resp.Body.Close()
+			if resp.StatusCode == http.StatusOK || (resp.StatusCode == http.StatusConflict && resp.Header.Get("X-Line-Accepted-Request-Id") != "") {
+				return nil
+			}
+			if resp.StatusCode != http.StatusTooManyRequests && resp.StatusCode < 500 {
+				return fmt.Errorf("LINE push rejected (%d)", resp.StatusCode)
+			}
+		}
+		if attempt < 2 {
+			timer := time.NewTimer(time.Duration(1<<attempt) * 100 * time.Millisecond)
+			select {
+			case <-ctx.Done():
+				timer.Stop()
+				return fmt.Errorf("LINE push cancelled")
+			case <-timer.C:
+			}
+		}
 	}
-	return nil
+	return fmt.Errorf("LINE push failed after bounded retries")
 }

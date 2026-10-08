@@ -196,6 +196,14 @@ func TestIntegrationPurchaseRoundsDeliveryAndPaidReport(t *testing.T) {
 	}
 	fund()
 	second := PurchaseInput{[]PurchaseItem{{item, 2, "20.00", &one}}, f.assistant.UserID.String() + "/" + uuid.NewString()}
+	review, e := s.PreviewPurchase(ctx, f.assistant, id, second)
+	if e != nil || review.Total != "40.00" || review.NextStatus != "completed" || review.Persisted || len(review.Items) != 1 || review.Items[0].UnitPrice != "16.67" {
+		t.Fatal("weighted purchase preview", review, e)
+	}
+	var before int
+	if e = f.pool.QueryRow(ctx, `SELECT actual_qty FROM requisition_item WHERE item_id=$1`, item).Scan(&before); e != nil || before != 1 {
+		t.Fatal("preview wrote quantity", e)
+	}
 	if _, e = s.Purchase(ctx, f.assistant, id, second); e != nil {
 		t.Fatal(e)
 	}
@@ -244,11 +252,36 @@ func TestIntegrationPurchaseRoundsDeliveryAndPaidReport(t *testing.T) {
 			t.Fatal(e)
 		}
 		var rows []struct {
-			Labor    string `json:"labor"`
-			Material string `json:"material"`
+			Labor        string `json:"labor"`
+			Material     string `json:"material"`
+			LaborDetails []struct {
+				Amount string `json:"allocated_net_wage"`
+			} `json:"labor_details"`
+			MaterialDetails []struct {
+				Amount string `json:"amount"`
+			} `json:"material_details"`
 		}
 		if e = json.Unmarshal(data, &rows); e != nil || len(rows) != 1 || rows[0].Labor != want || rows[0].Material != "50.00" {
 			t.Fatal("paid report mapping wrong", string(data), e)
+		}
+		var labor, material int64
+		for _, detail := range rows[0].LaborDetails {
+			value, e := Money(detail.Amount)
+			if e != nil {
+				t.Fatal(e)
+			}
+			labor += value
+		}
+		for _, detail := range rows[0].MaterialDetails {
+			value, e := Money(detail.Amount)
+			if e != nil {
+				t.Fatal(e)
+			}
+			material += value
+		}
+		wantLabor, _ := Money(want)
+		if labor != wantLabor || material != 5000 {
+			t.Fatal("report details do not reconcile with totals", labor, material)
 		}
 		if _, e = profitPDF(data); e != nil {
 			t.Fatal(e)

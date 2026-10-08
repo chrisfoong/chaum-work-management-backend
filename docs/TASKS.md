@@ -128,3 +128,19 @@ No shared Supabase schema/data changes, server startup, deployment or merge. Fro
 - [ ] Hosted CI rerun must be checked after this correction; do not treat the first failed run as passing.
 
 Auto-review rejected a proposed Git credential-helper extraction for API publication; that script was not executed and was removed. No credential was extracted/displayed. Existing Git push succeeded through its normal credential handling. No .env file inspected; no shared Supabase data/schema changed.
+
+## Detailed Use Case audit — feature/usecase-completion (2026-10-08)
+
+- [x] Read substantive SA tab descriptions for all 22 use cases; requested 5.2 QUERY TABLE tab is reference SQL, not the descriptions. Added USECASE_AUDIT.md mapping functions/routes/conditions/limits.
+- [x] Preserved existing Foundation and exported Supabase schema; inspected changed columns/types against metadata. No .env access, DDL, shared Supabase writes or server/jobs startup.
+- [x] Added schedule address/stored future status; shortage reason <=500; pending additional inspection and additional-only approval guards; correct no_purchase reviewer/time and inactive-equipment decline.
+- [x] Corrected 2A zero acquisition versus 7A positive quantity/initial approval/follow-up funding; added shared-validation purchase preview with no business writes and weighted-price review.
+- [x] Added labor/material report detail arrays that reconcile to exact totals, selected-assignment continuation flags, and new-payroll project/area summary notification.
+- [x] Added guarded notification-only resend, decision/delivery business_saved + delivery status, bounded transport retries and stable LINE retry keys. No expense/quantity/evidence replay; no durable outbox claimed.
+- [x] Baseline 198 tests/subtests passed before edits. Final gofmt, go test -count=1 ./..., go vet ./..., go build ./..., diff whitespace passed with explicitly isolated loopback PostgreSQL17 timezone=UTC: 219 passed, 0 failed, 0 skipped; statement coverage 62.2%.
+- [x] Confirmed parent hosted GitHub CI succeeds: run 37799511198 at 90f6660. This is parent evidence; new feature hosted CI is unverified until publication.
+- [ ] 9A persisted summary-sent/read history remains unavailable in the existing schema. Assignment continuation and actual summary transport exist, but do not claim historical notice list/no-message state.
+- [ ] Live LINE/Storage/QR/GPS end-to-end and Thai PDF typography remain pending. Durable persistence facilities require separately approved design, not implicit schema changes.
+- [ ] Further push held while completeness limits above remain explicit; previous 13 remote branches are unchanged. New feature is locally reviewable; no merge/deploy.
+
+Evidence artifacts: backend-usecase-tests.jsonl and backend-usecase-coverage.out in the task workspace. Local simulation/isolated integration is not deployed acceptance. See USECASE_AUDIT.md and API.md for exact functions/payloads.
