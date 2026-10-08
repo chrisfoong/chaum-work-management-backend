@@ -186,6 +186,13 @@ func Register(web, worker *gin.RouterGroup, s *Service) {
 		return s.RetryNotification(c.Request.Context(), p, c.Param("id"), in)
 	}))
 	asst.GET("/requisitions/:id/deliveries", func(c *gin.Context) { out, e := s.Deliveries(c.Request.Context(), c.Param("id")); respond(c, out, e) })
+	asst.GET("/assignments/:id/operations-summary", func(c *gin.Context) {
+		out, e := s.OperationsSummary(c.Request.Context(), actor(c), c.Param("id"), c.Query("period_start"), c.Query("period_end"))
+		respond(c, out, e)
+	})
+	sup.POST("/contracts/:id/operations-summary/notify", input(func(c *gin.Context, p auth.Principal, in OperationsNotificationInput) (any, error) {
+		return s.NotifyOperationsSummary(c.Request.Context(), p, c.Param("id"), in)
+	}))
 	asst.GET("/assignments/:id/continuation", func(c *gin.Context) {
 		out, e := s.AssignmentContinuation(c.Request.Context(), c.Param("id"))
 		respond(c, out, e)

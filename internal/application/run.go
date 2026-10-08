@@ -58,6 +58,7 @@ func Run() error {
 	r := server.New(server.Deps{DB: pool, AllowedOrigins: os.Getenv("WEB_ALLOWED_ORIGINS"), WebAuth: auth.Authenticate(auth.NewLineVerifier(cfg.WebChannel), users.ByLineID, auth.RoleSupervisor, auth.RoleAssistant), WorkerAuth: auth.Authenticate(auth.NewLineVerifier(cfg.WorkerChannel), users.ByLineID, auth.RoleWorker)})
 	r.Engine.OPTIONS("/*path", func(c *gin.Context) { c.Status(204) })
 	svc := work.New(pool, cfg.QRSecret)
+	svc.AssistantDashboardURL = os.Getenv("ASSISTANT_DASHBOARD_URL")
 	files := work.NewStorage(cfg.StorageURL, cfg.StorageKey, cfg.StorageBucket)
 	svc.Files = files
 	if cfg.MessagingToken != "" {

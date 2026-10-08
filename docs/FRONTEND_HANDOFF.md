@@ -17,7 +17,7 @@ All requests use the appropriate verified LINE ID token as Bearer authorization.
 | 8A handover | completed additional requisitions, `GET /requisitions/:id/delivery-schedules`, files, `POST /requisitions/:id/delivery`, `/deliveries` evidence | Assistant / web |
 | 4S / 5S payroll | `POST /attendance/finalize`, `/payroll/batch`, `GET /payroll`, `/payroll/:id/mark-paid` after actual transfer | Supervisor / web |
 | 6S profit | `GET /reports/profit` or `/reports/profit.pdf` with tor_id/period_start/period_end; month also supported | Supervisor / web |
-| 9A work dashboard | `GET /dashboard`, `/contracts`, `/contracts/:id/continuation` for active contract | Assistant / web |
+| 9A operations dashboard | `GET /assignments/:id/operations-summary?period_start=YYYY-MM-DD&period_end=YYYY-MM-DD`; existing dashboard/assignments for area selection | Assistant / web |
 | 1W schedule | `GET /schedules`; own upcoming assigned shifts with location/project/start/end | Worker / liff |
 | 2W leave | `POST /leave-requests` leave_date/reason <=500; date must have an assigned schedule | Worker / liff |
 | 3W check-in | Obtain assignment QR, GPS coordinates/accuracy, then `POST /attendance/check-in`; server time only | Worker / liff |
@@ -41,3 +41,9 @@ No paid_at field is available: do not substitute payroll created_at. `mark-paid`
 Detailed audit update: see USECASE_AUDIT.md and API.md. Cards include address and stored future statuses; shortages require reason <=500. 7A first approved purchase does not require prior funding; partial rounds do. 2A all-zero acquisition can escalate. Profit JSON includes labor_details/material_details. For selected area use Assistant /assignments/:id/continuation. Read decision/delivery business_saved and notification.status separately; use Assistant /notifications/:id/retry to resend failed notices without resubmitting a purchase or delivery. Do not display historical summary notices as implemented; schema has no notice/read ledger.
 
 Assistant POST /api/web/requisitions/:id/purchase/preview uses PurchaseInput and returns items(new_actual_qty/remaining_qty/new_actual_price/round_cost), round_total, next_status and persisted=false. It runs confirmation validation without quantity/expense/status writes. Use for 7A review; POST /purchase rechecks current data when confirming.
+
+## Confirmed 9A integration
+
+Frontend remains in its separate repository. Assistant chooses assignment and dates, queries operations-summary, displays only attendance/procurement, and refreshes current data. Use has_data/summary_notice for empty data; use can_continue/continuation_notice to disable new scheduling on ended/inactive/expired contracts. Never display unavailable notification/read history or an acknowledgement button.
+
+Supervisor button “แจ้งผลสรุปให้ผู้ดูแลงาน” calls the manual notify endpoint only after processing/reviewing 5S/6S, with supervisor_reviewed=true. This assertion is not a stored approval. Show returned notification status separately from financial processing success. Configure ASSISTANT_DASHBOARD_URL privately to the real HTTPS Assistant page; .env.example contains only a placeholder. Dashboard handles tor_id/period_start/period_end and authenticates before fetching current operational data. No automatic summary from payroll/profit confirmation.

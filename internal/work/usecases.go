@@ -308,31 +308,6 @@ func (s *Service) PayrollBatch(ctx context.Context, p auth.Principal, in Payroll
 			}
 		}
 	}
-	var newSlips []string
-	for _, result := range out {
-		if !result.Existing {
-			newSlips = append(newSlips, result.PayrollID)
-		}
-	}
-	if err == nil && len(newSlips) > 0 {
-		rows, e := s.Repo.Pool.Query(ctx, `SELECT DISTINCT a.tor_id::text FROM payroll p JOIN worker w ON w.user_id=p.user_id JOIN work_schedule sc ON sc.worker_id=w.worker_id JOIN tor_location_assignment a USING(assignment_id) WHERE sc.work_date BETWEEN $1::date AND $2::date AND sc.shift_status<>'cancelled' AND p.payroll_id=ANY($3::uuid[])`, in.Start, in.End, newSlips)
-		if e == nil {
-			var tors []string
-			for rows.Next() {
-				var tor string
-				if rows.Scan(&tor) == nil {
-					tors = append(tors, tor)
-				}
-			}
-			e = rows.Err()
-			rows.Close()
-			if e == nil {
-				for _, tor := range tors {
-					s.Event("continuation", tor)
-				}
-			}
-		}
-	}
 	return out, err
 }
 func (s *Service) PayrollMonth(ctx context.Context, p auth.Principal, month string, limit, offset int) (json.RawMessage, error) {
@@ -404,7 +379,6 @@ func (s *Service) CloseSummary(ctx context.Context, tor, start, end string) (jso
 	}
 	// 6S confirmation is a snapshot, not contract termination. No close ledger
 	// exists; never encode closure by changing contract status.
-	s.Event("continuation", tor)
 	return json.Marshal(struct {
 		Data        json.RawMessage `json:"data"`
 		ConfirmedAt string          `json:"confirmed_at"`

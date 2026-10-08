@@ -139,8 +139,24 @@ Auto-review rejected a proposed Git credential-helper extraction for API publica
 - [x] Added guarded notification-only resend, decision/delivery business_saved + delivery status, bounded transport retries and stable LINE retry keys. No expense/quantity/evidence replay; no durable outbox claimed.
 - [x] Baseline 198 tests/subtests passed before edits. Final gofmt, go test -count=1 ./..., go vet ./..., go build ./..., diff whitespace passed with explicitly isolated loopback PostgreSQL17 timezone=UTC: 219 passed, 0 failed, 0 skipped; statement coverage 62.2%.
 - [x] Confirmed parent hosted GitHub CI succeeds: run 37799511198 at 90f6660. This is parent evidence; new feature hosted CI is unverified until publication.
-- [ ] 9A persisted summary-sent/read history remains unavailable in the existing schema. Assignment continuation and actual summary transport exist, but do not claim historical notice list/no-message state.
+- [x] Superseded by user-confirmed 9A MVP: persisted summary/send/read history is outside scope, not a blocker. Current reports and manual notices require no new tables.
 - [ ] Live LINE/Storage/QR/GPS end-to-end and Thai PDF typography remain pending. Durable persistence facilities require separately approved design, not implicit schema changes.
 - [ ] Further push held while completeness limits above remain explicit; previous 13 remote branches are unchanged. New feature is locally reviewable; no merge/deploy.
 
 Evidence artifacts: backend-usecase-tests.jsonl and backend-usecase-coverage.out in the task workspace. Local simulation/isolated integration is not deployed acceptance. See USECASE_AUDIT.md and API.md for exact functions/payloads.
+
+## 9A design / live checks — 2026-10-08
+
+- [x] Proposed two-table snapshot/recipient queue design with Assistant-safe content and optional open/ack tracking in 9A_DESIGN_AND_LIVE_TEST_PLAN.md. No DDL implemented/executed. Read-receipt history is optional; 9A does not explicitly require it and its absence alone should not block all publication.
+- [x] Existing localhost server returned backend JSON for readiness 200 and four missing/invalid-token Web/Worker checks 401. No .env inspection, server start or business writes. This does not establish successful LINE login or intended DB/code revision.
+- [ ] Real Web/Worker login awaits nonsecret login/LIFF URLs and human login. Mutation flows await an explicitly isolated test environment; no shared Supabase writes authorized.
+
+## Confirmed 9A MVP — feature/assistant-operations-summary
+
+- [x] User superseded the persistence proposal: only 16 existing tables, live operational report, no financials/snapshots/send/read/ack history. Earlier automatic Assistant payroll summary is superseded.
+- [x] Added OperationsSummary and NotifyOperationsSummary; retained all-area Assistant scope and backend contract scheduling guards.
+- [x] Removed automatic Assistant summary from PayrollBatch/CloseSummary; existing Worker payslip notices remain.
+- [x] Added manual Supervisor review/closed-period/source-data/payroll/HTTPS guards, short LINE project/date Dashboard link and honest transport status.
+- [x] Updated API, requirements, frontend handoff and acceptance docs; no .env inspection, server startup or shared database/schema writes.
+- [x] Regenerated OpenAPI. Full gofmt, go test -count=1 ./..., go vet ./..., go build ./... and diff whitespace checks passed on explicitly isolated loopback PostgreSQL17 timezone=UTC: 233 tests/subtests passed, 0 failed, 0 skipped; statement coverage 63.5%. Evidence: backend-9a-tests.jsonl and backend-9a-coverage.out in task workspace.
+- [ ] Real successful LINE login, private Storage, GPS/QR, actual manual LINE delivery and Dashboard navigation remain live-unverified. No new tables needed for 9A; frontend work stays in its own repo.

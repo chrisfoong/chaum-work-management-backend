@@ -28,7 +28,7 @@ func (s *Service) Event(kind, id string) {
 			sql = query26
 		case "approval_needed", "purchase_funding", "replacement_needed":
 			sql = `SELECT user_id::text FROM public."USER" WHERE role='supervisor' AND is_active AND $1::uuid IS NOT NULL`
-		case "funded", "continuation":
+		case "funded":
 			sql = query27
 		case "request":
 			sql = query27
@@ -57,14 +57,6 @@ func (s *Service) Event(kind, id string) {
 		}
 		for _, user := range ids {
 			message := "Chaum: " + kind + " updated. Please open the app to view details."
-			if kind == "continuation" {
-				var summary string
-				if e := s.Repo.Pool.QueryRow(ctx, `SELECT 'Chaum: สรุปงานโครงการ ' || c.project_name || ' (' || c.contract_no || ')' || E'\nพื้นที่: ' || COALESCE(string_agg(l.location_name,', ' ORDER BY a.assignment_id),'') || E'\nกรุณาเปิดแอปเพื่อตรวจสอบสรุปและสถานะสัญญาก่อนดำเนินงานต่อ' FROM contract_tor c LEFT JOIN tor_location_assignment a USING(tor_id) LEFT JOIN location l USING(location_id) WHERE c.tor_id=$1 GROUP BY c.project_name,c.contract_no`, id).Scan(&summary); e != nil {
-					slog.Error("continuation summary unavailable")
-					continue
-				}
-				message = summary
-			}
 			if kind == "delivery" {
 				var summary string
 				if e := s.Repo.Pool.QueryRow(ctx, `SELECT 'Chaum: ส่งมอบอุปกรณ์คำขอ ' || r.requisition_no || E'\n' || COALESCE(string_agg(e.equipment_name || ' × ' || COALESCE(i.actual_qty,0)::text,E'\n' ORDER BY i.item_id),'') FROM equipment_requisition r JOIN requisition_item i USING(requisition_id) JOIN equipment e USING(equipment_id) WHERE r.requisition_id=$1 GROUP BY r.requisition_no`, id).Scan(&summary); e != nil {

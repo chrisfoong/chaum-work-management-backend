@@ -30,11 +30,12 @@ type Query interface {
 }
 type Repository struct{ Pool *pgxpool.Pool }
 type Service struct {
-	Repo     Repository
-	Now      func() time.Time
-	QRSecret []byte
-	Files    EvidenceStore
-	Notify   Notifier
+	Repo                  Repository
+	Now                   func() time.Time
+	QRSecret              []byte
+	Files                 EvidenceStore
+	Notify                Notifier
+	AssistantDashboardURL string
 }
 
 func New(pool *pgxpool.Pool, secret string) *Service {

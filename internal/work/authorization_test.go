@@ -43,6 +43,13 @@ func TestMutationRoleBoundaries(t *testing.T) {
 		method, path string
 		role         auth.Role
 	}{"POST", "/reports/profit/confirm", auth.RoleAssistant})
+	tests = append(tests, struct {
+		method, path string
+		role         auth.Role
+	}{"POST", "/contracts/" + id + "/operations-summary/notify", auth.RoleAssistant}, struct {
+		method, path string
+		role         auth.Role
+	}{"GET", "/assignments/" + id + "/operations-summary?period_start=2026-10-01&period_end=2026-10-15", auth.RoleSupervisor})
 	for _, tt := range tests {
 		t.Run(tt.method+tt.path, func(t *testing.T) {
 			r := gin.New()

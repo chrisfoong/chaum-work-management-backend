@@ -50,3 +50,7 @@ Run workflows that write data only on an approved isolated environment; local au
 [backend.yml](../.github/workflows/backend.yml) runs formatting, tests, vet and build on push/PR. PostgreSQL17 is a disposable service reachable through loopback; only that service receives isolated-test-schema.sql. No repository environment secrets, Supabase credentials, deployments or migrations of the live database are used. Skipped tests fail CI so integration cannot silently be counted as passing. Coverage/results are retained for seven days. The workflow has to run on GitHub before remote CI is considered verified.
 
 Schema limitations remain documented in REQUIREMENTS.md: durable outbox, historical wage snapshots, dedicated delivery/closing ledger and item-round history are not implemented persistence facilities. Passing tests does not remove these limitations.
+
+## 9A acceptance
+
+Confirmed scope excludes persisted summary/send/read history and acknowledgement. Isolated tests cover empty dates, current attendance, retrospective changes, no financial fields, contract continuation and schedule rejection, role/review/payroll/URL guards, absence of automatic Assistant summaries, and the manual link message using simulated LINE. Operator must configure the real HTTPS Assistant Dashboard URL and LINE transport privately. Successful real manual delivery and opening the authenticated Dashboard still require controlled live acceptance; automated tests do not prove them.
