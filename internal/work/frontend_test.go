@@ -6,6 +6,7 @@ import (
 	"github.com/google/uuid"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestFrontendFiltersRejectInvalidInputs(t *testing.T) {
@@ -52,9 +53,15 @@ func TestIntegrationFrontendReadModelsAndDeliveryGuards(t *testing.T) {
 	var shifts []struct {
 		Project string `json:"project_name"`
 		End     string `json:"shift_end_at"`
+		Start   string `json:"shift_start_at"`
 	}
-	if e = json.Unmarshal(data, &shifts); e != nil || len(shifts) != 1 || shifts[0].Project != "usecases" || !strings.HasPrefix(shifts[0].End, "2026-10-02T") {
+	if e = json.Unmarshal(data, &shifts); e != nil || len(shifts) != 1 || shifts[0].Project != "usecases" {
 		t.Fatal("overnight schedule read model", string(data), e)
+	}
+	start, startErr := time.Parse(time.RFC3339, shifts[0].Start)
+	end, endErr := time.Parse(time.RFC3339, shifts[0].End)
+	if startErr != nil || endErr != nil || end.Sub(start) != 8*time.Hour || start.In(Bangkok).Format("2006-01-02 15:04") != "2026-10-01 20:00" || end.In(Bangkok).Format("2006-01-02 15:04") != "2026-10-02 04:00" {
+		t.Fatal("schedule must cross midnight in Bangkok and last exactly eight hours")
 	}
 	for _, kind := range []string{"leave", "attendance", "requisitions"} {
 		if _, e = s.FilteredList(ctx, f.worker, kind, ListFilter{TorID: f.tor}, 100, 0); e != nil {
