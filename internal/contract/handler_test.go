@@ -141,6 +141,7 @@ func newEnv(store *fakeStore, notifier notify.Notifier) *testEnv {
 		env.txCount++
 		return fn(nil)
 	}, notifier)
+	svc.FileVerifier = func(context.Context, uuid.UUID, string) error { return nil }
 	svc.now = func() time.Time { return time.Date(2026, 10, 4, 18, 0, 0, 0, time.UTC) } // 2026-10-05 01:00 in Bangkok
 	svc.runAsync = func(f func()) { f() }
 
@@ -294,7 +295,7 @@ func TestConfirmContractSuccess(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &out); err != nil {
 		t.Fatal(err)
 	}
-	if out.Status != "registered" || out.ContractFileURL != nil || len(out.Areas) != 2 {
+	if out.Status != "registered" || (out.ContractFileURL == nil || *out.ContractFileURL != "test-contract.png") || len(out.Areas) != 2 {
 		t.Fatalf("unexpected body: %+v", out)
 	}
 	// One requisition per area, numbered per Bangkok day (UTC 18:00 on 4 Oct = 5 Oct in Bangkok).

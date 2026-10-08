@@ -44,12 +44,13 @@ type Store interface {
 // Service holds the 1S controller operations (ContractFormController and
 // ConfirmContractController in the class diagram).
 type Service struct {
-	store    Store
-	conn     db.DBTX
-	withTx   db.TxRunner
-	notifier notify.Notifier
-	now      func() time.Time
-	runAsync func(func())
+	store        Store
+	conn         db.DBTX
+	withTx       db.TxRunner
+	notifier     notify.Notifier
+	now          func() time.Time
+	runAsync     func(func())
+	FileVerifier func(context.Context, uuid.UUID, string) error
 }
 
 // NewService wires the 1S service. conn is used outside transactions.
@@ -132,6 +133,15 @@ func (s *Service) ConfirmContract(ctx context.Context, userID uuid.UUID, req Con
 		return ConfirmedContract{}, withConfirmPrefixes(apperr.Validation(errs...))
 	}
 
+	if strings.TrimSpace(c.ContractFilePath) == "" {
+		return ConfirmedContract{}, apperr.Validation(apperr.FieldError{Field: "contract.contract_file_path", Message: "uploaded PNG required"})
+	}
+	if s.FileVerifier == nil {
+		return ConfirmedContract{}, apperr.Conflict("storage_unavailable", "contract PNG verification is not configured")
+	}
+	if e := s.FileVerifier(ctx, userID, c.ContractFilePath); e != nil {
+		return ConfirmedContract{}, e
+	}
 	prefix := "REQ-" + s.now().In(bangkok).Format("20060102")
 	var (
 		result ConfirmedContract
@@ -187,7 +197,7 @@ func (s *Service) confirmInTx(ctx context.Context, q db.DBTX, userID uuid.UUID, 
 	out := ConfirmedContract{
 		TorID: torID, ContractNo: c.ContractNo, ProjectName: c.ProjectName, PartnerAgency: c.PartnerAgency,
 		StartDate: c.StartDate, EndDate: c.EndDate, ContractValue: c.ContractValue, Status: "registered",
-		Areas: make([]ConfirmedArea, 0, len(sc.Areas)),
+		ContractFileURL: &c.ContractFilePath, Areas: make([]ConfirmedArea, 0, len(sc.Areas)),
 	}
 	for i, a := range sc.Areas {
 		area, err := s.createArea(ctx, q, userID, torID, i, a, fmt.Sprintf("%s-%03d", prefix, seq+i))

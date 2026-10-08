@@ -294,7 +294,7 @@ func (s *Service) Purchase(ctx context.Context, p auth.Principal, id string, in 
 		return "", invalid("amount", "total exceeds NUMERIC(10,2)")
 	}
 	if total > 0 {
-		if e := s.evidence(ctx, p, in.Receipt); e != nil {
+		if e := s.evidencePhoto(ctx, p, in.Receipt); e != nil {
 			return "", e
 		}
 	}

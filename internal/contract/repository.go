@@ -43,15 +43,15 @@ func (TORRepository) CheckDuplicateLocationName(ctx context.Context, q db.DBTX, 
 	return exists(ctx, q, `SELECT COUNT(location_id) FROM location WHERE location_name = $1`, name)
 }
 
-// CreateContract is Q1S.3. TODO(decision-file): contract_file_url stays NULL.
+// CreateContract is Q1S.3; the verified private PNG path uses the existing column.
 func (TORRepository) CreateContract(ctx context.Context, q db.DBTX, userID uuid.UUID, c ContractInfo) (uuid.UUID, error) {
 	var id uuid.UUID
 	err := q.QueryRow(ctx, `
 		INSERT INTO contract_tor (contract_no, user_id, project_name, partner_agency, contract_value,
 		                          start_date, end_date, contract_file_url, status)
-		VALUES ($1, $2, $3, $4, $5::numeric, $6::date, $7::date, NULL, 'registered')
+		VALUES ($1, $2, $3, $4, $5::numeric, $6::date, $7::date, $8, 'registered')
 		RETURNING tor_id`,
-		c.ContractNo, userID, c.ProjectName, c.PartnerAgency, c.ContractValue, c.StartDate, c.EndDate,
+		c.ContractNo, userID, c.ProjectName, c.PartnerAgency, c.ContractValue, c.StartDate, c.EndDate, c.ContractFilePath,
 	).Scan(&id)
 	if err != nil {
 		return uuid.Nil, fmt.Errorf("create contract: %w", err)

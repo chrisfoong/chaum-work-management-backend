@@ -47,6 +47,12 @@ func mediaAllowed(p auth.Principal, mime string) bool {
 	return mime == "image/jpeg" || mime == "image/png" || (p.Role != auth.RoleWorker && mime == "application/pdf")
 }
 func (st *Storage) Verify(ctx context.Context, p auth.Principal, path string) error {
+	return st.verifyType(ctx, p, path, "")
+}
+func (st *Storage) VerifyPNG(ctx context.Context, p auth.Principal, path string) error {
+	return st.verifyType(ctx, p, path, "image/png")
+}
+func (st *Storage) verifyType(ctx context.Context, p auth.Principal, path, requiredMIME string) error {
 	if !owned(p, path) {
 		return invalid("photo_path", "must be an object uploaded by the actor")
 	}
@@ -66,7 +72,7 @@ func (st *Storage) Verify(ctx context.Context, p auth.Principal, path string) er
 	if e != nil {
 		return fmt.Errorf("storage read failed")
 	}
-	if len(body) == 0 || len(body) > 5*1024*1024 || !mediaAllowed(p, http.DetectContentType(body)) {
+	if len(body) == 0 || len(body) > 5*1024*1024 || !mediaAllowed(p, http.DetectContentType(body)) || (requiredMIME != "" && http.DetectContentType(body) != requiredMIME) {
 		return invalid("photo_path", "invalid file type or size")
 	}
 	return nil
@@ -125,9 +131,9 @@ func (st *Storage) Read(s *Service) gin.HandlerFunc {
 		}
 		if !owned(p, path) {
 			var allowed bool
-			query := `SELECT EXISTS(SELECT 1 FROM work_evidence WHERE photo_url=$1)`
+			query := `SELECT EXISTS(SELECT 1 FROM work_evidence WHERE photo_url=$1 UNION ALL SELECT 1 FROM contract_tor WHERE contract_file_url=$1 UNION ALL SELECT 1 FROM expense_claim WHERE receipt_photo_url=$1)`
 			if p.Role == auth.RoleSupervisor {
-				query = `SELECT EXISTS(SELECT 1 FROM work_evidence WHERE photo_url=$1 UNION ALL SELECT 1 FROM expense_claim WHERE receipt_photo_url=$1)`
+				query = `SELECT EXISTS(SELECT 1 FROM work_evidence WHERE photo_url=$1 UNION ALL SELECT 1 FROM expense_claim WHERE receipt_photo_url=$1 UNION ALL SELECT 1 FROM contract_tor WHERE contract_file_url=$1)`
 			}
 			if p.Role == auth.RoleWorker {
 				respond(c, nil, invalid("path", "not your object"))

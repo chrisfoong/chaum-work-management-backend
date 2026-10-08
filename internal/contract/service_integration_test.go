@@ -28,7 +28,8 @@ func countingService(pool *pgxpool.Pool, transactions *atomic.Int64) *Service {
 		transactions.Add(1)
 		return db.PoolTx(pool)(ctx, fn)
 	}, notify.Disabled{})
-	svc.runAsync = func(f func()) { f() } // finish notifications before the pool closes
+	svc.FileVerifier = func(context.Context, uuid.UUID, string) error { return nil } // Storage is tested separately with an HTTP test server.
+	svc.runAsync = func(f func()) { f() }                                            // finish notifications before the pool closes
 	return svc
 }
 
@@ -52,7 +53,7 @@ func confirmRequest(projectName string, areas ...Area) ConfirmRequest {
 		Contract: ContractInfo{
 			ContractNo:    fmt.Sprintf("8%09d", rand.Int64N(1e9)),
 			ProjectName:   projectName,
-			PartnerAgency: "ทดสอบ", StartDate: "2026-01-01", EndDate: "2026-12-31", ContractValue: "1000.00",
+			PartnerAgency: "ทดสอบ", StartDate: "2026-01-01", EndDate: "2026-12-31", ContractValue: "1000.00", ContractFilePath: "test-contract.png",
 		},
 		Scope: Scope{Areas: areas},
 	}

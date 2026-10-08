@@ -21,8 +21,8 @@ type ContractInfo struct {
 	StartDate     string `json:"start_date"`
 	EndDate       string `json:"end_date"`
 	// ContractValue is a decimal string (max 2 decimal places) so money never passes through float.
-	ContractValue string `json:"contract_value"`
-	// TODO(decision-file): the contract file (uc 1S step 3) is not accepted until its type and upload are decided.
+	ContractValue    string `json:"contract_value"`
+	ContractFilePath string `json:"contract_file_path"`
 }
 
 // Scope is scopeData: the step-2 work scope (uc 1S step 6).
@@ -69,7 +69,7 @@ type ConfirmedContract struct {
 	EndDate       string    `json:"end_date"`
 	ContractValue string    `json:"contract_value"`
 	Status        string    `json:"status"`
-	// ContractFileURL is always null until TODO(decision-file).
+	// ContractFileURL stores a private Storage object path, never a public URL.
 	ContractFileURL *string         `json:"contract_file_url"`
 	Areas           []ConfirmedArea `json:"areas"`
 }

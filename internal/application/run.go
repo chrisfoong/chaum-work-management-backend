@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
+	"github.com/google/uuid"
 	"github.com/joho/godotenv"
 	"log/slog"
 	"net/http"
@@ -64,7 +65,11 @@ func Run() error {
 	} else {
 		slog.Warn("LINE notifications disabled: messaging token missing")
 	}
-	contract.RegisterRoutes(r.Web, contract.NewHandler(contract.NewService(contract.TORRepository{}, pool, db.PoolTx(pool), contractNotify{svc})))
+	torService := contract.NewService(contract.TORRepository{}, pool, db.PoolTx(pool), contractNotify{svc})
+	torService.FileVerifier = func(ctx context.Context, user uuid.UUID, path string) error {
+		return files.VerifyPNG(ctx, auth.Principal{UserID: user, Role: auth.RoleSupervisor}, path)
+	}
+	contract.RegisterRoutes(r.Web, contract.NewHandler(torService))
 	work.Register(r.Web, r.Worker, svc)
 	r.Web.POST("/files", files.Upload)
 	r.Worker.POST("/files", files.Upload)
