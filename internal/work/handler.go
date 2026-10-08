@@ -24,6 +24,7 @@ func Register(web, worker *gin.RouterGroup, s *Service) {
 	worker.Use(func(c *gin.Context) {
 		if _, e := s.Worker(c.Request.Context(), s.Repo.Pool, actor(c).UserID.String()); e != nil {
 			respond(c, nil, e)
+			c.Abort()
 			return
 		}
 		c.Next()
@@ -31,10 +32,10 @@ func Register(web, worker *gin.RouterGroup, s *Service) {
 	for _, g := range []*gin.RouterGroup{web, worker} {
 		g.GET("/dashboard", func(c *gin.Context) { out, e := s.Dashboard(c.Request.Context(), actor(c)); respond(c, out, e) })
 		g.GET("/me", func(c *gin.Context) { out, e := s.Me(c.Request.Context(), actor(c)); respond(c, out, e) })
-		g.GET("/schedules", list(s.Schedules))
-		g.GET("/leave-requests", list(s.Leaves))
-		g.GET("/attendance", list(s.Attendance))
-		g.GET("/requisitions", list(s.Requisitions))
+		g.GET("/schedules", filteredList(s, "schedules"))
+		g.GET("/leave-requests", filteredList(s, "leave"))
+		g.GET("/attendance", filteredList(s, "attendance"))
+		g.GET("/requisitions", filteredList(s, "requisitions"))
 		g.GET("/requisitions/:id", func(c *gin.Context) {
 			out, e := s.RequisitionDetail(c.Request.Context(), actor(c), c.Param("id"))
 			respond(c, out, e)
@@ -77,6 +78,43 @@ func Register(web, worker *gin.RouterGroup, s *Service) {
 		id, e := s.Equipment(c.Request.Context(), c.Param("id"), in)
 		return gin.H{"equipment_id": id}, e
 	}))
+	web.GET("/assignments", func(c *gin.Context) {
+		l, o, e := paging(c)
+		if e != nil {
+			respond(c, nil, e)
+			return
+		}
+		out, e := s.Assignments(c.Request.Context(), c.Query("tor_id"), l, o)
+		respond(c, gin.H{"data": out, "limit": l, "offset": o}, e)
+	})
+	asst.GET("/workers/available", func(c *gin.Context) {
+		l, o, e := paging(c)
+		if e != nil {
+			respond(c, nil, e)
+			return
+		}
+		out, e := s.AvailableWorkers(c.Request.Context(), c.Query("work_date"), "", l, o)
+		respond(c, gin.H{"data": out, "limit": l, "offset": o}, e)
+	})
+	asst.GET("/leave-requests/:id/candidates", func(c *gin.Context) {
+		l, o, e := paging(c)
+		if e != nil {
+			respond(c, nil, e)
+			return
+		}
+		out, e := s.LeaveCandidates(c.Request.Context(), c.Param("id"), l, o)
+		respond(c, gin.H{"data": out, "limit": l, "offset": o}, e)
+	})
+	asst.GET("/leave-requests/:id", func(c *gin.Context) { out, e := s.LeaveDetail(c.Request.Context(), c.Param("id")); respond(c, out, e) })
+	asst.GET("/requisitions/:id/delivery-schedules", func(c *gin.Context) {
+		l, o, e := paging(c)
+		if e != nil {
+			respond(c, nil, e)
+			return
+		}
+		out, e := s.DeliverySchedules(c.Request.Context(), c.Param("id"), l, o)
+		respond(c, gin.H{"data": out, "limit": l, "offset": o}, e)
+	})
 	asst.POST("/schedules", input(func(c *gin.Context, _ auth.Principal, in ScheduleInput) (any, error) {
 		ids, e := s.Schedule(c.Request.Context(), in)
 		return gin.H{"schedule_ids": ids}, e

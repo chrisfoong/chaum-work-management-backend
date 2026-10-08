@@ -7,7 +7,7 @@ import (
 )
 
 func (s *Service) Contracts(ctx context.Context, limit, offset int) (json.RawMessage, error) {
-	return s.Repo.List(ctx, s.Repo.Pool, query11, limit, offset)
+	return s.Repo.List(ctx, s.Repo.Pool, query11, limit, offset, s.Now().In(Bangkok).Format("2006-01-02"))
 }
 func (s *Service) Contract(ctx context.Context, id string) (json.RawMessage, error) {
 	if e := validID(id, "tor_id"); e != nil {

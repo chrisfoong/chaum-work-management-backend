@@ -23,6 +23,16 @@ func TestMutationRoleBoundaries(t *testing.T) {
 	tests = append(tests, struct {
 		method, path string
 		role         auth.Role
+	}{"GET", "/workers/available?work_date=2026-10-08", auth.RoleSupervisor}, struct {
+		method, path string
+		role         auth.Role
+	}{"GET", "/leave-requests/" + id + "/candidates", auth.RoleSupervisor}, struct {
+		method, path string
+		role         auth.Role
+	}{"GET", "/requisitions/" + id + "/delivery-schedules", auth.RoleSupervisor})
+	tests = append(tests, struct {
+		method, path string
+		role         auth.Role
 	}{"POST", "/requisitions/" + id + "/decision", auth.RoleSupervisor}, struct {
 		method, path string
 		role         auth.Role

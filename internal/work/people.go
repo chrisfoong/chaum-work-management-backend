@@ -296,7 +296,11 @@ func (s *Service) schedule(ctx context.Context, q Query, in ScheduleInput) ([]st
 		if e != nil {
 			return nil, e
 		}
-		if id != worker || !available || !active {
+		var onLeave bool
+		if e = q.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM leave_request WHERE user_id=$1 AND leave_date=$2::date AND status='approved')`, user, in.WorkDate).Scan(&onLeave); e != nil {
+			return nil, e
+		}
+		if id != worker || !available || !active || onLeave {
 			return nil, conflict("worker unavailable")
 		}
 		if e = lock(ctx, q, "payroll:"+user); e != nil {

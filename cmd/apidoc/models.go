@@ -83,6 +83,33 @@ func describeRequest(method, path string, op map[string]any) {
 		op["requestBody"] = map[string]any{"required": true, "content": map[string]any{"application/octet-stream": map[string]any{"schema": map[string]string{"type": "string", "format": "binary"}}}}
 	}
 	if method == "GET" {
+		if strings.HasSuffix(path, "/schedules") || strings.HasSuffix(path, "/attendance") || strings.HasSuffix(path, "/leave-requests") || strings.HasSuffix(path, "/requisitions") {
+			params := []map[string]any{}
+			if existing, ok := op["parameters"].([]map[string]any); ok {
+				params = append(params, existing...)
+			}
+			for _, name := range []string{"limit", "offset", "status", "assignment_id", "tor_id", "period_start", "period_end", "requisition_type"} {
+				schema := map[string]any{"type": "string"}
+				if name == "limit" || name == "offset" {
+					schema["type"] = "integer"
+				}
+				if name == "assignment_id" || name == "tor_id" {
+					schema["format"] = "uuid"
+				}
+				if name == "period_start" || name == "period_end" {
+					schema["format"] = "date"
+				}
+				params = append(params, map[string]any{"name": name, "in": "query", "required": false, "schema": schema})
+			}
+			op["parameters"] = params
+		}
+		if strings.HasSuffix(path, "/workers/available") {
+			op["parameters"] = []map[string]any{{"name": "work_date", "in": "query", "required": true, "schema": map[string]string{"type": "string", "format": "date"}}}
+		}
+		if strings.HasSuffix(path, "/assignments") {
+			op["parameters"] = []map[string]any{{"name": "tor_id", "in": "query", "schema": map[string]string{"type": "string", "format": "uuid"}}}
+		}
+
 		if strings.HasSuffix(path, "/reports/profit") || strings.HasSuffix(path, "/reports/profit.csv") || strings.HasSuffix(path, "/reports/profit.pdf") {
 			op["parameters"] = []map[string]any{{"name": "month", "in": "query", "required": false, "schema": map[string]string{"type": "string", "pattern": `^\d{4}-\d{2}$`}}, {"name": "tor_id", "in": "query", "schema": map[string]string{"type": "string", "format": "uuid"}}, {"name": "period_start", "in": "query", "schema": map[string]string{"type": "string", "format": "date"}}, {"name": "period_end", "in": "query", "schema": map[string]string{"type": "string", "format": "date"}}}
 		}
