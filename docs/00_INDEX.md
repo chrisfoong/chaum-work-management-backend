@@ -7,3 +7,5 @@
 5. API.md for routes
 
 Older docs and migrations are historical. Do not apply them to Supabase. The root task.md points to the single canonical tracker.
+
+6. [BACKEND_ACCEPTANCE.md](BACKEND_ACCEPTANCE.md) for configuration responsibilities, login diagnosis and live acceptance.

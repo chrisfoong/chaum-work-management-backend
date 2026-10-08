@@ -104,3 +104,17 @@ Reviewable work is split into stacked local feature branches/commits for TOR fil
 - [ ] Push blocked: GitHub returned 403, permission denied to authenticated Git account Sxthxwit on chrisfoong/chaum-work-management-backend. No branches published by this attempt; no Draft PR/merge/deployment. Requires Write permission or an authorized Git identity before retry.
 
 See VERIFICATION_AND_PUBLISH.md. No .env inspected or production data/schema changed.
+
+## Backend completion audit — 2026-10-08
+
+- [x] Baseline passed before changes on the existing complete branch using isolated loopback PostgreSQL17.
+- [x] Added composed LINE verification + real USER lookup + Web/Worker role integration coverage. Actual LINE response is simulated, no live credentials used.
+- [x] Added actual /me HTTP integration: Supervisor/Assistant/Worker, role changes without restart, wrong-role rejection, missing Worker mapping (404), duplicate mapping (409), inactive account (401).
+- [x] Added GitHub Actions formatting/tests/vet/build with disposable PostgreSQL17; skipped tests fail CI; results/coverage retained seven days. Workflow YAML parsed locally.
+- [x] Final local checks pass: 198 tests/subtests, zero fail/skip, gofmt, vet, build, diff whitespace check. Total statement coverage 61.0%.
+- [x] Added BACKEND_ACCEPTANCE.md separating operator configuration, historical reported Supervisor login success and live checks still pending.
+- [x] Corrected stale Assistant-all-areas comments, receipt rules and agent documentation paths. Local .env variants ignored; .env.example remains tracked. No .env content inspected.
+- [ ] GitHub CI execution awaits publication; local YAML validation is not a hosted workflow run.
+- [ ] Real Assistant/Worker LINE login, private Storage, QR/GPS and actual messaging remain unverified in this task. Shared conversation reports these configuration gaps; current values have not been inspected.
+
+No shared Supabase schema/data changes, server startup, deployment or merge. Frontend remains in a separate repository. Persistence limits remain explicit in REQUIREMENTS.md.

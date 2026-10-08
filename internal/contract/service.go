@@ -282,7 +282,7 @@ func (s *Service) SendNewContractNotification(torID uuid.UUID, projectName strin
 		ctx, cancel := context.WithTimeout(context.Background(), notifyTimeout)
 		defer cancel()
 
-		// TODO(decision-12): recipients are every active assistant until area permission is decided.
+		// All active assistants manage every area under the confirmed policy.
 		lineIDs, err := s.store.FindActiveAssistantLineIDs(ctx, s.conn)
 		if err != nil {
 			slog.Error("new contract notification failed", "tor_id", torID, "error", err)

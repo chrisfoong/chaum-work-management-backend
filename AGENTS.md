@@ -1,6 +1,6 @@
 # Chaum Backend agent instructions
 
-Continue the existing Go/Gin backend. Read docs/TASKS.md, REQUIREMENTS.md and API.md. Business authority is the latest SA-Group5 Use Case Description adopted by the user on 2026-10-08; it supersedes previous Supervisor leave, 24h notice and single-purchase policies. Backend only; preserve the existing Foundation.
+Continue the existing Go/Gin backend. Read docs/TASKS.md, docs/REQUIREMENTS.md and docs/API.md. Business authority is the latest SA-Group5 Use Case Description adopted by the user on 2026-10-08; it supersedes previous Supervisor leave, 24h notice and single-purchase policies. Backend only; preserve the existing Foundation.
 
 Never open, read, inspect, copy or modify .env files, directly or via scripts/diagnostics/other agents. Never log credentials, tokens, DSNs or bank details. .env.example is placeholders only. Normal server config loading requires separate user authorization and does not authorize secret inspection.
 

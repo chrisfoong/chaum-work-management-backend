@@ -209,8 +209,8 @@ func (TORRepository) SearchLocations(ctx context.Context, q db.DBTX, query strin
 }
 
 // FindActiveAssistantLineIDs returns the LINE userIds of all active assistants.
-// TODO(decision-12): until assistants are linked to contracts, every active
-// assistant receives the 1S notification.
+// All active assistants manage every area under the confirmed policy
+// and receive the 1S notification.
 func (TORRepository) FindActiveAssistantLineIDs(ctx context.Context, q db.DBTX) ([]string, error) {
 	rows, err := q.Query(ctx, `SELECT line_id FROM public."USER" WHERE role = 'assistant' AND is_active ORDER BY user_id`)
 	if err != nil {

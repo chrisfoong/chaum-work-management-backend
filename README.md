@@ -31,3 +31,7 @@ API changes include expected_actual_qty on each purchase item and Assistant owne
 ## Final frontend guide coverage
 
 Supabase remains the application database. Added private PNG contract confirmation, Assistant replacement candidates/leave details, filtered lists with joined project/shift data, contract workflow status, and eligible delivery schedules with transactional date/quantity checks. See docs/FRONTEND_HANDOFF.md for the workflow-to-API mapping. No advance replacement acceptance, check-in photo, nine-hour shift, notification inbox or payment timestamp is required by the adopted guide. No production schema or data is changed by this implementation.
+
+## Automated and live acceptance
+
+GitHub Actions in .github/workflows/backend.yml runs the full isolated PostgreSQL17 suite and rejects skipped tests. No Supabase secrets are used. See [backend acceptance](docs/BACKEND_ACCEPTANCE.md) for Web/Worker login diagnosis, configuration ownership and pending live checks. Historical shared evidence reports Supervisor login success; Worker/QR/Storage/message delivery remain separately unverified.
