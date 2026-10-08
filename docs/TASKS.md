@@ -7,7 +7,7 @@ Updated 2026-10-08. Business authority: latest SA-Group5 Use Case Descriptions a
 - [x] Existing schema mapping, LINE auth, ownership, TOR Foundation preserved.
 - [x] 3A active contract/equipment readiness/minimum staffing/one worker-day guards.
 - [x] 2W emergency/advance dates; 4A Assistant review plus atomic replacement and rollback.
-- [x] 4S advance-only leave exemption; emergency absence penalty; GPS/QR and overnight behavior retained.
+- [x] 3W same-day early replacement confirmation; 4S advance-only leave exemption; emergency absence penalty; GPS/QR and overnight behavior retained.
 - [x] 5W active attendance gate; 5A TOR-wide inspection; 6A explicit purchase/no_purchase.
 - [x] 1A base survey; 2S/3S funding/approval; 2A/7A partial repeated purchases, replay guard, latest/weighted prices and zero-cost rounds.
 - [x] 8A matching recipient delivery/photos, transactional rollback/retry and post-delivery notification.

@@ -6,6 +6,7 @@ Business source: [SA-Group5 Use Case Descriptions](https://docs.google.com/docum
 - 3A: active/in-date contract, all initial TOR equipment completed, active available workers, minimum required_workers (not a maximum), one worker/day. Eight-hour shifts support midnight crossing.
 - 2W/4A: future Bangkok date is advance leave, same day is emergency; past requests rejected. Assistant approves/rejects and optionally creates replacement atomically. Keep original schedule; approval without replacement alerts Supervisor. Existing replacement endpoint supports later assignment.
 - 4S: only approved advance leave avoids absent status/penalty. Approved emergency leave without check-in remains absent. Retain shift-end +2h cutoff where the description has no precise cutoff.
+- 3W permits assigned workers to confirm/check in on the scheduled calendar day before start; 4S classifies early check-in as on_time. Future-day and ended shifts are rejected; overnight continuation remains supported.
 - Attendance retains both signed QR (60s) and GPS <=200m through LOCATION/TOR assignment, accuracy <=50m, server timestamps/Bangkok dates.
 - 5W requires current active check-in/no checkout. 5A compares original additional request against base and pending additional requests across the TOR. Historical quantity is not proof of equipment condition.
 - 6A explicitly decides purchase/no_purchase on original request. Purchase goes to Supervisor approval; no_purchase maps to rejected and sends explanation to requester without persisting it, per description.

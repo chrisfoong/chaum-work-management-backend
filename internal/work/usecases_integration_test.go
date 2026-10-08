@@ -89,6 +89,19 @@ func TestIntegrationEmergencyLeaveAndAtomicReplacement(t *testing.T) {
 	if e != nil || len(ids) != 1 {
 		t.Fatal(e)
 	}
+	// 3W permits today's assigned replacement to confirm before shift start;
+	// 4S classifies check-in <= planned start as on_time.
+	lat, lon, accuracy := 13.75, 100.5, 10.0
+	qr, e := s.QR(ctx, f.assignment)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if e = s.CheckIn(ctx, f.other, CheckIn{ids[0], &lat, &lon, &accuracy, qr["qr_token"].(string)}); e != nil {
+		t.Fatal("same-day early replacement check-in rejected", e)
+	}
+	if e = f.pool.QueryRow(ctx, `SELECT status::text FROM attendance WHERE schedule_id=$1`, ids[0]).Scan(&state); e != nil || state != "on_time" {
+		t.Fatal("early check-in must be on_time", state, e)
+	}
 	*f.now = time.Date(2026, 10, 4, 18, 0, 0, 0, Bangkok)
 	if _, e = s.Finalize(ctx); e != nil {
 		t.Fatal(e)

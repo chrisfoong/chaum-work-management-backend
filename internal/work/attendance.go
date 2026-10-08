@@ -115,7 +115,7 @@ func (s *Service) CheckIn(ctx context.Context, p auth.Principal, in CheckIn) err
 			return e
 		}
 		now := s.Now()
-		if state != "scheduled" || now.Before(start) || !now.Before(start.Add(8*time.Hour)) {
+		if state != "scheduled" || now.In(Bangkok).Format("2006-01-02") < date || !now.Before(start.Add(8*time.Hour)) {
 			return conflict("shift is not open for check-in")
 		}
 		var leave bool
