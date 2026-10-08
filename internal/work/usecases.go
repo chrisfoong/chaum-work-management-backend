@@ -110,7 +110,7 @@ func (s *Service) DecideRequest(ctx context.Context, p auth.Principal, id string
 		if in.Decision == "no_purchase" {
 			next = "rejected"
 		}
-		_, e := q.Exec(ctx, `UPDATE equipment_requisition SET status=$2 WHERE requisition_id=$1`, id, next)
+		_, e := q.Exec(ctx, `UPDATE equipment_requisition SET status=$2::text::requisition_status_enum,reason=CASE WHEN $2::text='pending_approval' THEN reason || E'\n[Purchase decision] ' || $3 ELSE reason END WHERE requisition_id=$1`, id, next, in.Reason)
 		return e
 	})
 	if err == nil {
@@ -169,11 +169,18 @@ func (s *Service) Deliver(ctx context.Context, p auth.Principal, id string, in D
 			return e
 		}
 		var valid bool
-		if e = q.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM work_schedule WHERE schedule_id=$1 AND worker_id=$2 AND assignment_id=$3 AND shift_status<>'cancelled')`, in.ScheduleID, worker, assignment).Scan(&valid); e != nil {
+		if e = q.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM work_schedule WHERE schedule_id=$1 AND worker_id=$2 AND assignment_id=$3 AND shift_status<>'cancelled' AND work_date<=$4::date FOR SHARE)`, in.ScheduleID, worker, assignment, s.Now().In(Bangkok).Format("2006-01-02")).Scan(&valid); e != nil {
 			return e
 		}
 		if !valid {
 			return conflict("recipient schedule must match request owner and assignment")
+		}
+		var complete bool
+		if e = q.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM requisition_item WHERE requisition_id=$1) AND NOT EXISTS(SELECT 1 FROM requisition_item WHERE requisition_id=$1 AND COALESCE(actual_qty,0)<to_buy_qty)`, id).Scan(&complete); e != nil {
+			return e
+		}
+		if !complete {
+			return conflict("delivery requires all requested equipment to be procured")
 		}
 		var items string
 		if e = q.QueryRow(ctx, `SELECT COALESCE(string_agg(e.equipment_name || ' x' || COALESCE(i.actual_qty,0)::text,', ' ORDER BY i.item_id),'') FROM requisition_item i JOIN equipment e USING(equipment_id) WHERE i.requisition_id=$1`, id).Scan(&items); e != nil {

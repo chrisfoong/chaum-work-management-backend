@@ -228,10 +228,12 @@ func (s *Service) notify(ctx context.Context, user, msg string) {
 	if s.Repo.Pool.QueryRow(ctx, `SELECT line_id FROM public."USER" WHERE user_id=$1 AND is_active`, user).Scan(&line) != nil {
 		return
 	}
-	if e := s.Notify.Send(ctx, line, msg); e != nil {
-		slog.Warn("notification failed")
-	} else {
-		slog.Info("notification accepted by LINE; recipient delivery unverified")
+	for _, part := range notificationParts(msg) {
+		if e := s.Notify.Send(ctx, line, part); e != nil {
+			slog.Warn("notification failed")
+		} else {
+			slog.Info("notification accepted by LINE; recipient delivery unverified")
+		}
 	}
 }
 

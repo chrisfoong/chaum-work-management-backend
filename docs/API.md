@@ -31,3 +31,19 @@ Errors have request IDs and sanitized internals. Business success does not promi
 - Supervisor POST /reports/profit/confirm: {tor_id, period_start, period_end} returns snapshot, confirmed_at, persisted=false. Does not change contract status. Assistant GET /contracts/:id/continuation returns assignments for active unexpired TOR.
 
 Notifications are best effort. No Worker delivery notification is emitted during purchase. Persistent closing history/outbox/item-round history require a separately approved persistence design.
+
+## Backend contract for the final frontend guide
+
+- POST /api/web/contracts/confirm requires contract.contract_file_path from POST /api/web/files (PNG bytes <=5MiB). Persists the verified private object path in contract_file_url. Never submit an arbitrary external URL. /contracts/info previews textual formats; final confirmation verifies the uploaded PNG.
+- Purchase receipts for both 2A/7A: JPEG/PNG when positive total; funding receipts retain JPEG/PNG/PDF. Raw upload stays <=5MiB; no multipart.
+- GET /api/web/assignments?tor_id=UUID&limit=50&offset=0 supplies assignment, contract, location, required_workers and can_schedule.
+- GET /api/web/workers/available?work_date=YYYY-MM-DD lists valid free workers for scheduling. Assistant only.
+- GET /api/web/leave-requests/:id gives affected schedule/location/project. GET /api/web/leave-requests/:id/candidates supplies free candidates excluding the leaver. Assistant only. Lists remain data/limit/offset; candidates are not a reservation and are rechecked during submission.
+- GET /schedules, /leave-requests, /attendance, /requisitions in their authorized web/liff groups accept status, assignment_id, tor_id, period_start, period_end, limit and offset; requisitions also accepts requisition_type. Filters run before pagination. Dates on requisitions mean creation date in Bangkok. Existing Worker upcoming-scheduled restriction/ownership still applies.
+- Schedule cards include project_name, contract_no, worker names, shift_start_at and shift_end_at as timestamps; shift_end_at=start+8h, possibly next date. Worker check-in still requires schedule_id, latitude, longitude, accuracy_m, qr_token; there is no advance accept/reject endpoint.
+- GET /api/web/requisitions/:id/delivery-schedules lists only original requester's matching area schedules dated today or earlier. Assistant only. POST delivery also rechecks this rule and full procurement inside transaction. Guide payload remains schedule_id/description/photo_paths; all items are delivered together.
+- Staff GET /contracts adds workflow_status (registered/active/ended) and can_operate, without changing stored enum values. Staff dashboard includes latest 100 contracts; use paginated /contracts for the complete list.
+- /requisitions/:id/decision purchase reason is appended to stored reason for Supervisor review; no_purchase explanation is sent to Worker without persisting, per Use Case.
+- 6W uses LINE Chat. Delivery notifications include requisition number/equipment/quantity, no Worker notification at purchase. Missing config/network failure remains delivery-unverified; no inbox/replacement-acceptance/paid_at is invented.
+
+Frontend process payroll by calling Supervisor /attendance/finalize followed by /payroll/batch after period/cutoff closure. Retrying batch reuses existing slips; mark-paid records confirmation only and does not execute a bank transfer.

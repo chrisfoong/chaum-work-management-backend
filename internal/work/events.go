@@ -57,6 +57,14 @@ func (s *Service) Event(kind, id string) {
 		}
 		for _, user := range ids {
 			message := "Chaum: " + kind + " updated. Please open the app to view details."
+			if kind == "delivery" {
+				var summary string
+				if e := s.Repo.Pool.QueryRow(ctx, `SELECT 'Chaum: ส่งมอบอุปกรณ์คำขอ ' || r.requisition_no || E'\n' || COALESCE(string_agg(e.equipment_name || ' × ' || COALESCE(i.actual_qty,0)::text,E'\n' ORDER BY i.item_id),'') FROM equipment_requisition r JOIN requisition_item i USING(requisition_id) JOIN equipment e USING(equipment_id) WHERE r.requisition_id=$1 GROUP BY r.requisition_no`, id).Scan(&summary); e != nil {
+					slog.Error("delivery summary unavailable")
+					continue
+				}
+				message = summary
+			}
 			if kind == "request_review" {
 				var state, reason string
 				if s.Repo.Pool.QueryRow(ctx, `SELECT status::text,reason FROM equipment_requisition WHERE requisition_id=$1`, id).Scan(&state, &reason) == nil && state == "rejected" {

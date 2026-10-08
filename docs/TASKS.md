@@ -31,3 +31,18 @@ Changed code: gofmt, go test -count=1 ./..., go vet ./..., go build ./... passed
 ## Unchanged-schema limits
 
 UUIDs/real enum labels override illustrative document SQL. Payroll uses user_id; generated to_buy_qty is never written. Delivery evidence uses a description prefix without DB FK/delivery status. Closing explicitly returns persisted=false. No durable outbox, historical wage snapshots or replacement relation. Backend locks do not cover direct DB writers. None of these limitations are claimed as implemented persistent facilities.
+
+## Final frontend guide — backend completion 2026-10-08
+
+- [x] 1S: required uploaded private PNG <=5MiB at confirmation; verify owner/actual MIME/size before transaction; save existing contract_file_url; retain wizard and 10-digit/date/value validations.
+- [x] 3A/4A: Assistant-only available-worker/leave-candidate/detail APIs; exclude original leaver, busy/inactive/unavailable/approved-leave/calculated-period workers; conflict on duplicate mappings before paging; recheck approved leave during schedule write.
+- [x] 1W/9A: project/location/worker names and start/end timestamps, exact 8h overnight shifts; contract workflow_status/can_operate in lists/dashboard; existing enums unchanged.
+- [x] Status/date/TOR/assignment/type filters applied in SQL before paging; preserve Worker ownership and abort missing/duplicate-worker middleware before route execution.
+- [x] 2A/7A receipt photos when positive total; 2S funding retains PDF support. Purchase decision reason now available to Supervisor review.
+- [x] 8A: eligible original-recipient delivery schedules; reject future dates and incomplete quantities; all purchased items handed over using guide's schedule/description/photos payload; photos/retries retain atomicity; LINE summary has actual items/quantities with bounded message chunks.
+- [x] Adopt user's exclusions: no advance replacement accept/reject, no check-in photo requirement, no nine-hour mock shifts, no notification inbox, no required paid_at. Both GPS+QR retained; checkout photos and LINE Chat retained.
+- [x] API/OpenAPI, requirements, handoff and README updated. Tests cover invalid filters, ownership, candidate conflicts, delivery guards/retry, overnight read model, roles, required TOR file, MIME/size/owner and notification chunk integrity.
+
+Verification: unchanged baseline tests passed on an isolated loopback PostgreSQL17 database created for this task. Final implementation gofmt/test/vet/build passed: 177 tests/subtests, 0 failures, 0 skipped. No .env accessed, server/jobs not started, production Supabase/schema/data not changed. HTTP test servers verify Storage byte/type/size/ownership and existing LINE transport tests; deployed LINE/private Storage/Supabase end-to-end remains unverified.
+
+Reviewable work is split into stacked local feature branches/commits for TOR file upload, frontend read APIs, and delivery validation. Draft PR publication remains blocked by previously verified GitHub write denial; no merge/deploy. See FRONTEND_HANDOFF.md for the final use-case-to-route contract.

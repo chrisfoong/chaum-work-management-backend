@@ -13,3 +13,5 @@ Follow REQUIREMENTS.md for same-day emergency leave, advance-only absence exempt
 Delivery records use a documented WORK_EVIDENCE description convention because no requisition FK exists. Closing confirmation is a snapshot with persisted=false, never terminate a contract to imitate closing. Do not claim durable outbox, item-round history, wage snapshots or replacement relations absent from schema.
 
 Use feature/<name> branches; preserve uncommitted work. User authorized local feature commits/push/Draft PRs, never merge/deploy. Run gofmt, go test ./..., go vet ./..., go build ./.... Integration writes require explicitly isolated loopback PostgreSQL. Skipped means unverified. Keep docs/TASKS.md honest.
+
+Latest frontend guide: exclude advance replacement acceptance; confirm today's shift with both GPS/QR and exactly eight hours. Checkout photos, LINE Chat equipment results, actual schema-based payslips, contract status dashboard. TOR PNG <=5MiB is verified server-side. Purchase receipt photos for base/additional, funding may include PDF. Keep candidate/read-model filters and ownership in SQL. No mock Figma statuses/times are requirements.

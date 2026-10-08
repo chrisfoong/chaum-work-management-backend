@@ -20,3 +20,13 @@ Business source: [SA-Group5 Use Case Descriptions](https://docs.google.com/docum
 Limits: no persistent closing ledger, delivery relation/status, item-round history, replacement relation, wage snapshots or durable outbox. Closing confirmation returns a timestamped snapshot persisted=false, not contract termination. Delivery uses a description convention. Notification acceptance does not prove delivery. PDF uses TOR UUIDs and English financial fields; Thai project names remain in JSON/CSV. Direct DB writers can bypass application locks.
 
 Never inspect .env or modify Supabase schema. Integration writes use an explicitly isolated loopback test database only.
+
+## Frontend guide adopted on 2026-10-08
+
+No advance replacement accept/reject flow. Worker confirms today's assigned shift through GPS AND QR check-in, server timestamp, exactly eight hours (08:00–16:00 when scheduled at 08:00), overnight supported. Photos are required at checkout, not check-in. Equipment notifications are LINE Chat only; no notification inbox. Payslip shows base/deductions/net without inventing paid_at. Assistant dashboard reports actual contract status and derived workflow_status/can_operate. Figma mock 09-hour shifts and alternative GPS/QR do not override these policies.
+
+TOR confirmation requires a private uploaded PNG <=5MiB, verified server-side and stored in existing contract_file_url; no public URL or schema change. Wizard /contracts/info is a format preview; verification is enforced at /contracts/confirm. Base and additional purchases both use JPEG/PNG receipts when total >0; funding allows JPEG/PNG/PDF. Leave reasons <=500, Supervisor procurement rejection <=1000, checkout description <=1000.
+
+Replacement candidates exclude original requester, inactive/unavailable, existing same-day schedules (including cancelled because DB uniqueness persists), approved leave and already calculated payroll periods. Eligibility is rechecked when scheduling; duplicate mappings conflict before candidate pagination. API reads filter in SQL before pagination and preserve Worker ownership.
+
+Delivery rejects future schedules and incomplete procurement even if status was incorrectly marked completed. Guide 8A supplies schedule/description/photos, no new delivered-quantity field: all purchased quantities are handed over together, validated in the locked request transaction. Delivery LINE message includes request number/item quantities; messages split conservatively at LINE character bounds. Notifications remain best effort, not a durable queue.
