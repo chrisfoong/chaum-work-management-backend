@@ -47,7 +47,7 @@ LINE retries follow [official retry-key guidance](https://developers.line.biz/en
 
 ## Remaining work that cannot be called complete
 
-- Live Assistant/Worker LINE login, private Storage, actual LINE Chat delivery and QR/GPS end-to-end need operator verification; local simulation is not live acceptance.
+- Real LINE read suites now passed: Supervisor 16/16, Assistant 16/16, Worker 11/11. Private Storage, actual LINE Chat delivery and QR/GPS end-to-end still need operator verification. See FINAL_USECASE_REVIEW.md for current evidence and test-data cleanup.
 - 9A persisted summary/send/read history and acknowledgement are explicitly outside the confirmed MVP, not a completion blocker. Current-data reports may change after retrospective edits. No new tables are required. Legacy continuation history_available=false is not a claim that no notice was sent.
 - Durable notification scheduling/recovery after restart, closing ledger, item-by-item purchase history, wage snapshots and replacement relations are absent schema facilities. Retry APIs cover immediate/manual resends without replaying business writes.
 - Thai text in PDF remains limited. JSON/CSV preserve names; PDF identifies TOR by UUID.
