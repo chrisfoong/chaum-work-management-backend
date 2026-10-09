@@ -69,7 +69,7 @@ func (s *Service) FilteredList(ctx context.Context, p auth.Principal, kind strin
 	switch kind {
 	case "schedules":
 		sql = frontendSchedules
-		args = append(args, s.Now().In(Bangkok).Format("2006-01-02"))
+		args = append(args, s.Now())
 	case "leave":
 		sql = frontendLeaves
 	case "attendance":
