@@ -160,3 +160,37 @@ Evidence artifacts: backend-usecase-tests.jsonl and backend-usecase-coverage.out
 - [x] Updated API, requirements, frontend handoff and acceptance docs; no .env inspection, server startup or shared database/schema writes.
 - [x] Regenerated OpenAPI. Full gofmt, go test -count=1 ./..., go vet ./..., go build ./... and diff whitespace checks passed on explicitly isolated loopback PostgreSQL17 timezone=UTC: 233 tests/subtests passed, 0 failed, 0 skipped; statement coverage 63.5%. Evidence: backend-9a-tests.jsonl and backend-9a-coverage.out in task workspace.
 - [ ] Real successful LINE login, private Storage, GPS/QR, actual manual LINE delivery and Dashboard navigation remain live-unverified. No new tables needed for 9A; frontend work stays in its own repo.
+
+## Real LINE role checks — 2026-10-08
+
+- [x] User authorized shared SA_DB role changes for USER 11111111-1111-1111-1111-111111111111 only. Switched supervisor -> assistant -> worker -> supervisor; each change returned one active row; restored supervisor verified. No Worker mapping or business data added, no .env access, server startup/restart or schema edits.
+- [x] Real Web LINE /me 200 for target Supervisor, then Assistant with same verified token and DB-resolved role. Assistant payroll/locations 403; missing/invalid tokens and wrong Worker audience 401.
+- [ ] Live read suites each 14 pass/2 fail: assignments and workers/available return 404 non-JSON from current process/gateway despite routes existing in latest local code. Running revision unverified; not counted as complete live acceptance.
+- [ ] Worker desktop helper login encounters LINE 400 before Backend; direct Worker LIFF opens smartphone QR. No valid Worker token obtained; worker_rows=0. Successful Worker login/reads remain unverified, not passed.
+
+Detailed sanitized evidence and helper changes: line-login-test/LIVE_RESULTS_2026-10-08.md and ROLE_TEST_PLAN.md in task workspace. Historical live-pending entries above now superseded for Supervisor/Assistant login only; Storage/GPS/QR/messages and Worker remain pending.
+## All-role live recheck — 2026-10-09
+
+- [x] Supervisor and Assistant read-only LINE suites each 16 pass, 0 fail on user-restarted backend. Target /me identity verified. Previously missing assignments/workers-available routes now return expected results, including Assistant 200 versus Supervisor 403 for available workers.
+- [x] Temporarily switched the same authorized USER role to assistant/worker and restored supervisor; each scoped UPDATE returned one active row. No Worker mapping added; precheck count=0. No .env, schema or business workflow changes.
+- [x] Worker role correctly denied Web API 403 with real Web token. A clean Worker login attempt still reaches LINE 400 before Backend; not counted as successful Worker authentication.
+- [x] Read-only LINE Console identified Worker Developing Endpoint still default LINE page and openid unchecked. Scope editor cancelled without save. Requested confirmation for endpoint/openid change and separate Worker mapping preparation.
+- [ ] Successful real Worker login/read suite awaits approved LINE configuration and Worker mapping; simulated tests are separate evidence. Storage/GPS/QR/messages/write workflows remain unverified.
+
+Evidence: line-login-test/LIVE_RESULTS_2026-10-09.md in task workspace. Earlier 404 failures are historical and resolved for Web roles. No server was started/restarted by this check.
+## Final Use Case verification and live cleanup — 2026-10-09
+
+- [x] Freshly exported SA-Group5 source; rechecked all 22 substantive Use Case Descriptions against routes/implementation/tests and confirmed user overrides. No missing Backend flow identified; external acceptance limits remain explicit. See FINAL_USECASE_REVIEW.md.
+- [x] Real LINE read suites completed: Supervisor 16/16, Assistant 16/16, Worker 11/11. Endpoint/openid issues and Worker mapping absence above are historical, resolved for the live Worker test.
+- [x] User authorized adding exactly one Worker mapping, then deleting it and restoring Supervisor. Cleanup checked related Worker FK records and removed only worker_id fb3629c2-65cd-48dc-b72f-c802a0ef7bda. Verified target USER active=true, role=supervisor, worker_rows=0. This bounded shared-data exception is not authorization for other mutation tests.
+- [x] Fresh gofmt/test/vet/build/diff-check passed on final branch: 233 tests/subtests, 0 failed, 0 skipped, 16 packages. Statement coverage 63.1%. Isolated PostgreSQL17 database chaum_final_audit_20261009 at loopback:55439 only; schema initialization there, never on Supabase.
+- [ ] 5S wording reconciliation in USECASE_AUDIT.md deferred by user on 2026-10-09. Reverted only that wording edit; existing manual 9A runtime behavior and verification evidence remain unchanged.
+- [ ] Live private Storage/upload, physical GPS+QR check-in/out, actual LINE message delivery and Assistant dashboard navigation remain unverified. Empty-list reads do not validate populated business workflows.
+- [ ] Thai PDF typography remains limited; unchanged-schema persistence limits remain documented, with 9A history explicitly outside MVP.
+
+Evidence: task workspace backend-final-tests.jsonl, backend-final-coverage.out and line-login-test/LIVE_RESULTS_2026-10-09.md. No .env access, Supabase DDL/migrations/seeds, normal server/jobs startup, new push/PR/merge/deploy.
+
+## Current handoff — 2026-10-10
+- [x] Paired startup/acceptance guide: SERVER_AND_TEST_STATUS.md (Backend 8080, Frontend 5500, LINE tunnel).
+- [x] Latest rerun: 235 tests/subtests, 0 failures/test skips on isolated PostgreSQL; vet/build passed. Live LINE roles and QR issuance/expiry verified; shared test mapping deleted and Supervisor restored.
+- [ ] Populated procurement/funding/delivery, Storage transfer, physical GPS+camera attendance/checkout, payroll/payment/export and actual LINE recipient delivery remain live-unverified. Historical pending-login notes are superseded by this handoff; mock tests are separate evidence.
