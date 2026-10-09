@@ -106,6 +106,8 @@ type Location struct {
 	LocationID   uuid.UUID `json:"location_id"`
 	LocationName string    `json:"location_name"`
 	Address      *string   `json:"address"`
+	Latitude     *string   `json:"latitude"`
+	Longitude    *string   `json:"longitude"`
 }
 
 func (c ContractInfo) normalized() ContractInfo {

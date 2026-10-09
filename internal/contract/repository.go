@@ -188,7 +188,7 @@ func (TORRepository) CreateRequisitionItem(ctx context.Context, q db.DBTX, requi
 // not in the use case or class diagram): up to limit locations whose name contains query.
 func (TORRepository) SearchLocations(ctx context.Context, q db.DBTX, query string, limit int) ([]Location, error) {
 	rows, err := q.Query(ctx, `
-		SELECT location_id, location_name, address
+		SELECT location_id, location_name, address, latitude::text, longitude::text
 		FROM location
 		WHERE location_name ILIKE '%' || $1 || '%' ESCAPE '\'
 		ORDER BY location_name
@@ -199,7 +199,7 @@ func (TORRepository) SearchLocations(ctx context.Context, q db.DBTX, query strin
 	}
 	locations, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (Location, error) {
 		var l Location
-		err := r.Scan(&l.LocationID, &l.LocationName, &l.Address)
+		err := r.Scan(&l.LocationID, &l.LocationName, &l.Address, &l.Latitude, &l.Longitude)
 		return l, err
 	})
 	if err != nil {
