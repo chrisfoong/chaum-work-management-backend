@@ -1,12 +1,7 @@
 // Package auth authenticates requests and checks roles.
 //
-// Web (Supervisor, Assistant): Supabase Auth access token; users.user_id equals
-// the Supabase Auth user id (decision 13, see docs/04).
-// Worker (LINE Mini App): LIFF ID token verified with LINE; users.line_id holds
-// the LINE user id.
-//
-// Area/assignment permission derived from USER MANAGES CONTRACT_TOR is
-// TODO(decision-12): role checks only until D12 is decided.
+// Both Web and LINE Mini App use server-verified LINE ID tokens resolved to
+// public."USER" by line_id. Assistants access all areas; workers only their own data.
 package auth
 
 import (

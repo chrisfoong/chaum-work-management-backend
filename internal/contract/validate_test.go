@@ -8,7 +8,7 @@ import (
 func validInfo() ContractInfo {
 	return ContractInfo{
 		ContractNo: "6700001148", ProjectName: "โครงการปรับปรุงภูมิทัศน์", PartnerAgency: "การทางพิเศษแห่งประเทศไทย",
-		StartDate: "2026-01-15", EndDate: "2026-12-31", ContractValue: "1500000.00",
+		StartDate: "2026-01-15", EndDate: "2026-12-31", ContractValue: "1500000.00", ContractFilePath: "test-contract.png",
 	}
 }
 

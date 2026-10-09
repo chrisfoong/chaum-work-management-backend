@@ -2,6 +2,7 @@ package contract
 
 import (
 	"context"
+	"errors"
 	"os"
 	"testing"
 
@@ -19,6 +20,9 @@ import (
 func testConn(t *testing.T) db.DBTX {
 	t.Helper()
 	url := os.Getenv("TEST_DATABASE_URL")
+	if url != "" && os.Getenv("TEST_DATABASE_ISOLATED") != "yes" {
+		t.Fatal("TEST_DATABASE_ISOLATED=yes required")
+	}
 	if url == "" {
 		t.Skip("TEST_DATABASE_URL not set: integration test skipped (SQL unverified)")
 	}
@@ -51,7 +55,7 @@ func insertSupervisor(t *testing.T, q db.DBTX) uuid.UUID {
 	t.Helper()
 	var id uuid.UUID
 	err := q.QueryRow(context.Background(), `
-		INSERT INTO users (first_name, last_name, phone_number, role, line_id, bank_name, bank_account_no)
+		INSERT INTO public."USER" (first_name, last_name, phone_number, role, line_id, bank_name, bank_account_no)
 		VALUES ('ทดสอบ', 'ระบบ', '0800000001', 'supervisor', 'U00000000000000000000000000000001', 'test', '000')
 		RETURNING user_id`).Scan(&id)
 	if err != nil {
@@ -97,8 +101,8 @@ func TestIntegrationDuplicateLocationNameIsUniqueViolation(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, err := repo.CreateLocation(ctx, q, "สวนทดสอบ", "อื่น")
-	if name, ok := db.UniqueViolation(err); !ok || name != constraintLocationName {
-		t.Fatalf("err = %v, want unique violation on %s", err, constraintLocationName)
+	if !errors.Is(err, errDuplicateLocation) {
+		t.Fatalf("expected application duplicate guard, got %v", err)
 	}
 }
 

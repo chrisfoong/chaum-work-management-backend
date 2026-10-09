@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -24,6 +25,7 @@ const (
 
 // Store is the data access the service needs; TORRepository implements it.
 type Store interface {
+	LockRequisitionNumbering(context.Context, db.DBTX, int32) error
 	CheckDuplicateContractNo(ctx context.Context, q db.DBTX, contractNo string) (bool, error)
 	ValidateLocation(ctx context.Context, q db.DBTX, locationID uuid.UUID) (bool, error)
 	CheckDuplicateLocationName(ctx context.Context, q db.DBTX, name string) (bool, error)
@@ -42,12 +44,13 @@ type Store interface {
 // Service holds the 1S controller operations (ContractFormController and
 // ConfirmContractController in the class diagram).
 type Service struct {
-	store    Store
-	conn     db.DBTX
-	withTx   db.TxRunner
-	notifier notify.Notifier
-	now      func() time.Time
-	runAsync func(func())
+	store        Store
+	conn         db.DBTX
+	withTx       db.TxRunner
+	notifier     notify.Notifier
+	now          func() time.Time
+	runAsync     func(func())
+	FileVerifier func(context.Context, uuid.UUID, string) error
 }
 
 // NewService wires the 1S service. conn is used outside transactions.
@@ -130,6 +133,15 @@ func (s *Service) ConfirmContract(ctx context.Context, userID uuid.UUID, req Con
 		return ConfirmedContract{}, withConfirmPrefixes(apperr.Validation(errs...))
 	}
 
+	if strings.TrimSpace(c.ContractFilePath) == "" {
+		return ConfirmedContract{}, apperr.Validation(apperr.FieldError{Field: "contract.contract_file_path", Message: "uploaded PNG required"})
+	}
+	if s.FileVerifier == nil {
+		return ConfirmedContract{}, apperr.Conflict("storage_unavailable", "contract PNG verification is not configured")
+	}
+	if e := s.FileVerifier(ctx, userID, c.ContractFilePath); e != nil {
+		return ConfirmedContract{}, e
+	}
 	prefix := "REQ-" + s.now().In(bangkok).Format("20060102")
 	var (
 		result ConfirmedContract
@@ -141,6 +153,10 @@ func (s *Service) ConfirmContract(ctx context.Context, userID uuid.UUID, req Con
 			result, txErr = s.confirmInTx(ctx, q, userID, c, sc, prefix)
 			return txErr
 		})
+		if ctx.Err() != nil {
+			err = errRequisitionNoTaken
+			break
+		}
 		if !errors.Is(err, errRequisitionNoTaken) {
 			break
 		}
@@ -162,6 +178,10 @@ func (s *Service) ConfirmContract(ctx context.Context, userID uuid.UUID, req Con
 }
 
 func (s *Service) confirmInTx(ctx context.Context, q db.DBTX, userID uuid.UUID, c ContractInfo, sc Scope, prefix string) (ConfirmedContract, error) {
+	day, _ := strconv.Atoi(strings.TrimPrefix(prefix, "REQ-"))
+	if err := s.store.LockRequisitionNumbering(ctx, q, int32(day)); err != nil {
+		return ConfirmedContract{}, err
+	}
 	torID, err := s.store.CreateContract(ctx, q, userID, c)
 	if name, ok := db.UniqueViolation(err); ok && name == constraintContractNo {
 		return ConfirmedContract{}, duplicateContractNo()
@@ -177,7 +197,7 @@ func (s *Service) confirmInTx(ctx context.Context, q db.DBTX, userID uuid.UUID, 
 	out := ConfirmedContract{
 		TorID: torID, ContractNo: c.ContractNo, ProjectName: c.ProjectName, PartnerAgency: c.PartnerAgency,
 		StartDate: c.StartDate, EndDate: c.EndDate, ContractValue: c.ContractValue, Status: "registered",
-		Areas: make([]ConfirmedArea, 0, len(sc.Areas)),
+		ContractFileURL: &c.ContractFilePath, Areas: make([]ConfirmedArea, 0, len(sc.Areas)),
 	}
 	for i, a := range sc.Areas {
 		area, err := s.createArea(ctx, q, userID, torID, i, a, fmt.Sprintf("%s-%03d", prefix, seq+i))
@@ -195,6 +215,9 @@ func (s *Service) createArea(ctx context.Context, q db.DBTX, userID, torID uuid.
 	var locationID uuid.UUID
 	if a.NewLocation != nil {
 		id, err := s.store.CreateLocation(ctx, q, a.NewLocation.Name, a.NewLocation.Address)
+		if errors.Is(err, errDuplicateLocation) {
+			return ConfirmedArea{}, duplicateLocationName(i)
+		}
 		if name, ok := db.UniqueViolation(err); ok && name == constraintLocationName {
 			return ConfirmedArea{}, duplicateLocationName(i)
 		}
@@ -259,7 +282,7 @@ func (s *Service) SendNewContractNotification(torID uuid.UUID, projectName strin
 		ctx, cancel := context.WithTimeout(context.Background(), notifyTimeout)
 		defer cancel()
 
-		// TODO(decision-12): recipients are every active assistant until area permission is decided.
+		// All active assistants manage every area under the confirmed policy.
 		lineIDs, err := s.store.FindActiveAssistantLineIDs(ctx, s.conn)
 		if err != nil {
 			slog.Error("new contract notification failed", "tor_id", torID, "error", err)

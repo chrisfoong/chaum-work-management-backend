@@ -23,9 +23,10 @@ type ErrorBody struct {
 
 // ErrorDetail describes one error response.
 type ErrorDetail struct {
-	Code    string              `json:"code"`
-	Message string              `json:"message"`
-	Fields  []apperr.FieldError `json:"fields,omitempty"`
+	Code      string              `json:"code"`
+	Message   string              `json:"message"`
+	Fields    []apperr.FieldError `json:"fields,omitempty"`
+	RequestID string              `json:"request_id,omitempty"`
 }
 
 // WriteError aborts the request with err as an ErrorBody. Errors that are not
@@ -36,12 +37,13 @@ func WriteError(c *gin.Context, err error) {
 		ae = apperr.Internal(err)
 	}
 	if ae.Kind == apperr.KindInternal {
-		slog.ErrorContext(c.Request.Context(), "request failed", "route", c.FullPath(), "error", err)
+		slog.ErrorContext(c.Request.Context(), "request failed", "route", c.FullPath(), "request_id", c.GetString("request_id"), "code", ae.Code)
 	}
 	c.AbortWithStatusJSON(apperr.HTTPStatus(ae.Kind), ErrorBody{Error: ErrorDetail{
-		Code:    ae.Code,
-		Message: ae.Message,
-		Fields:  ae.Fields,
+		Code:      ae.Code,
+		Message:   ae.Message,
+		Fields:    ae.Fields,
+		RequestID: c.GetString("request_id"),
 	}})
 }
 

@@ -21,8 +21,8 @@ var (
 
 const (
 	maxTextLen = 255 // varchar(255) in the data dictionary
-	// maxContractValueDigits is the integer part allowed by numeric(14, 2).
-	maxContractValueDigits = 12
+	// Supabase uses numeric(12, 2).
+	maxContractValueDigits = 10
 )
 
 type fieldErrors []apperr.FieldError
