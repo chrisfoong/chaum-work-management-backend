@@ -4,6 +4,7 @@ import (
 	"chrisfoong/chaum-work-management-backend/internal/auth"
 	"context"
 	"encoding/json"
+	"strings"
 	"time"
 )
 
@@ -266,4 +267,87 @@ func (s *Service) createPayroll(ctx context.Context, q Query, p auth.Principal, 
 		}
 	}
 	return id, nil
+}
+
+type PayrollBatchInput struct {
+	Start string `json:"period_start"`
+	End   string `json:"period_end"`
+}
+type PayrollBatchResult struct {
+	UserID    string `json:"user_id"`
+	PayrollID string `json:"payroll_id"`
+	Existing  bool   `json:"existing"`
+}
+
+func (s *Service) PayrollBatch(ctx context.Context, p auth.Principal, in PayrollBatchInput) ([]PayrollBatchResult, error) {
+	if e := Period(in.Start, in.End); e != nil {
+		return nil, e
+	}
+	end, _ := Date(in.End)
+	if s.Now().Before(end.AddDate(0, 0, 1)) {
+		return nil, conflict("payroll period has not closed")
+	}
+	out := []PayrollBatchResult{}
+	err := s.Repo.Transaction(ctx, func(q Query) error {
+		rows, e := q.Query(ctx, `SELECT DISTINCT w.user_id::text FROM worker w JOIN work_schedule sc ON sc.worker_id=w.worker_id WHERE sc.work_date BETWEEN $1::date AND $2::date AND sc.shift_status<>'cancelled' ORDER BY w.user_id::text`, in.Start, in.End)
+		if e != nil {
+			return e
+		}
+		var users []string
+		for rows.Next() {
+			var user string
+			if e = rows.Scan(&user); e != nil {
+				rows.Close()
+				return e
+			}
+			users = append(users, user)
+		}
+		e = rows.Err()
+		rows.Close()
+		if e != nil {
+			return e
+		}
+		for _, user := range users {
+			if _, e = s.Worker(ctx, q, user); e != nil {
+				return e
+			}
+			if e = lock(ctx, q, "payroll:"+user); e != nil {
+				return e
+			}
+			var existing string
+			e = q.QueryRow(ctx, `SELECT payroll_id::text FROM payroll WHERE user_id=$1 AND period_start=$2::date AND period_end=$3::date`, user, in.Start, in.End).Scan(&existing)
+			if e == nil {
+				out = append(out, PayrollBatchResult{user, existing, true})
+				continue
+			}
+			if !isMissing(e) {
+				return e
+			}
+			id, e := s.createPayroll(ctx, q, p, PayrollInput{user, in.Start, in.End})
+			if e != nil {
+				return e
+			}
+			out = append(out, PayrollBatchResult{user, id, false})
+		}
+		return nil
+	})
+	if err == nil {
+		for _, r := range out {
+			if !r.Existing {
+				s.Event("payroll", r.PayrollID)
+			}
+		}
+	}
+	return out, err
+}
+func (s *Service) PayrollMonth(ctx context.Context, p auth.Principal, month string, limit, offset int) (json.RawMessage, error) {
+	if e := Month(month); e != nil {
+		return nil, e
+	}
+	var owner any
+	if p.Role == auth.RoleWorker {
+		owner = p.UserID
+	}
+	sql := strings.Replace(query35, "ORDER BY p.period_start", "AND to_char(p.period_start,'YYYY-MM')=$4 ORDER BY p.period_start", 1)
+	return s.Repo.List(ctx, s.Repo.Pool, sql, owner, limit, offset, month)
 }

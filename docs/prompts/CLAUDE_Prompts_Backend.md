@@ -58,7 +58,7 @@ I initialised something in this repo before you started. Do not change any file.
 
 ```
 Compare the physical schema in this repo (migration files / SQL schema; do not connect
-to a live database unless I say so) against docs/02_domain_model.md and docs/04_decisions_and_corrections.md.
+to a live database unless I say so) against docs/historical/02_domain_model.md and docs/historical/04_decisions_and_corrections.md.
 
 Produce docs/decisions/schema-mapping.md (create the file only after showing me the
 outline and getting approval) with:
@@ -90,7 +90,7 @@ Deliver a plan (no code) containing:
 1. Package/directory layout (handler → service → repository, notifier, storage, jobs).
 2. A workflow matrix: use case → endpoint(s) → service → repository functions →
    entities touched → role/area permission → transaction boundary.
-   Cover 1S–6S, 1A–9A, 1W–7W from docs/06_architecture_and_conventions.md (workflow map) and docs/03_workflows_operations.md.
+   Cover 1S–6S, 1A–9A, 1W–7W from docs/historical/06_architecture_and_conventions.md (workflow map) and docs/03_workflows_operations.md.
 3. Cross-cutting design: config, DB pool, transaction helper, error model, request
    validation, auth middleware (reuse existing), role + area permission, LINE identity
    resolution for Worker endpoints, Supabase Storage interface, notifier interface
@@ -211,7 +211,7 @@ Use canonical, corrected references:
 - Payroll insert: worker_id, period_start, period_end, base_wage, total_deduction,
   net_wage, is_paid=false. net_wage = base_wage - total_deduction (do not change the
   formula or negative-pay treatment; D10 is open).
-- Penalty tiers per docs/05_business_rules.md. Re-running 5S must not create duplicate payroll or
+- Penalty tiers per docs/historical/05_business_rules.md. Re-running 5S must not create duplicate payroll or
   deduction rows; propose the guard in the plan and wait for approval (D8).
 - 7W payslip: base_wage, total_deduction, net_wage, is_paid; deductions with their work
   date via attendance_id; penalty_amount. Own data only.

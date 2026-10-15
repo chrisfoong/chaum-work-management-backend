@@ -1,6 +1,6 @@
 # API notes
 
-api/openapi.yaml lists actual routes/request models (JSON is valid YAML1.2). Regenerate: go run ./cmd/apidoc. Documentation tooling is never an auth bypass in the server.
+api/openapi.json lists actual routes/request models. Regenerate: `go run ./cmd/apidoc > api/openapi.json`. Documentation tooling is never an auth bypass in the server.
 
 Web /api/web uses verified LINE Web tokens and Supervisor/Assistant; Mini App /api/liff uses Worker channel tokens and DB Worker role. Send Bearer authorization. Client IDs/roles never establish identity.
 
