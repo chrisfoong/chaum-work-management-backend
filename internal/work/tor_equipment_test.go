@@ -26,13 +26,19 @@ func TestIntegrationAssignmentEquipmentFiltersTORAndOwner(t *testing.T) {
 	}
 	read := func(limit, offset int) []struct {
 		ID string `json:"equipment_id"`
-	} { data, e := s.AssignmentEquipment(ctx, f.worker, f.assignment, limit, offset); if e != nil {
-		t.Fatal(e)
-	}; var out []struct {
-		ID string `json:"equipment_id"`
-	}; if e = json.Unmarshal(data, &out); e != nil {
-		t.Fatal(e)
-	}; return out }
+	} {
+		data, e := s.AssignmentEquipment(ctx, f.worker, f.assignment, limit, offset)
+		if e != nil {
+			t.Fatal(e)
+		}
+		var out []struct {
+			ID string `json:"equipment_id"`
+		}
+		if e = json.Unmarshal(data, &out); e != nil {
+			t.Fatal(e)
+		}
+		return out
+	}
 	if result := read(100, 0); len(result) != 1 || result[0].ID != in {
 		t.Fatalf("wrong TOR equipment: %+v", result)
 	}
