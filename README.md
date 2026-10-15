@@ -2,13 +2,13 @@
 
 Go/Gin continued from develop, reconciled against supplied Supabase exports (16 tables, 121 columns). Never run historical migrations on the existing database.
 
-Read [requirements](docs/REQUIREMENTS.md), [progress](docs/TASKS.md), [API notes](docs/API.md), [OpenAPI](api/openapi.yaml), and [agent rules](AGENTS.md).
+Read [requirements](docs/REQUIREMENTS.md), [progress](docs/TASKS.md), [API notes](docs/API.md), [OpenAPI](api/openapi.json), and [agent rules](AGENTS.md).
 
 ## Run
 
 Copy .env.example to .env. Configure existing database and LINE Web/Mini App channel IDs/provider. Confirm both channels belong to the same provider in LINE Developers; provider ID is a deployment declaration, not an automatic lookup. Keep secrets out of Git.
 
-Run: `go run ./cmd/server` (root entry point uses the same application). Startup checks columns/constraints/required enums read-only and rejects incompatibility without repairing the DB. Clients send Authorization: Bearer <LINE ID token>; server verifies configured audience and resolves public."USER".line_id, rejecting unknown/inactive users.
+Run: `go run ./cmd/server`. Startup checks columns/constraints/required enums read-only and rejects incompatibility without repairing the DB. Clients send Authorization: Bearer <LINE ID token>; server verifies configured audience and resolves public."USER".line_id, rejecting unknown/inactive users.
 
 QR_SIGNING_SECRET needs at least32 bytes. Existing private Storage bucket and server-only service key enable evidence/receipts. Missing Storage blocks dependent operations; missing messaging token explicitly disables notifications. WEB_ALLOWED_ORIGINS is a comma-separated allowlist.
 

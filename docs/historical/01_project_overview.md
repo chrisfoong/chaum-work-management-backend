@@ -19,7 +19,7 @@ It manages: contracts (TOR), work locations, equipment requirements and procurem
 | Worker | คนสวน | LINE Mini App | View schedule, request leave, substitute check-in, submit work report (also checks out), report missing equipment, view request result, view payslip |
 | Replacement worker | — | LINE Mini App | A worker who covers an absent worker (substitute check-in, 3W) |
 
-**Identity:** `user_id = worker_id`. A worker is a user. See `docs/04_decisions_and_corrections.md`.
+**Identity:** `user_id = worker_id`. A worker is a user. See `docs/historical/04_decisions_and_corrections.md`.
 
 ## To-be flow in one paragraph
 Supervisor signs a TOR and records it (contract, locations, required workers, required equipment). Assistant checks existing equipment against the TOR (site survey) and computes what to buy. Supervisor transfers funds; assistant buys with a receipt photo; procurement is cumulative until complete. Assistant schedules workers per location and date. Workers may request leave; the assistant approves/rejects and may assign a replacement who then checks in as a substitute. Workers check in/out via the LINE app (the work report with photo evidence performs check-out). A daily job classifies attendance (on time / late / leave / absent). A periodic job creates deductions (penalties) and payroll. If equipment runs short during work, a worker requests it; the assistant reviews, forwards or rejects, buys, and records delivery. The supervisor views a financial report: revenue minus labor minus material cost.

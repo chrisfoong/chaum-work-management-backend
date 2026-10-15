@@ -31,6 +31,19 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+      - name: Check docs/FILE_INVENTORY.md is current
+        run: |
+          python3 - <<'PY'
+          import os, re, subprocess
+          listed = set(re.findall(r'^\| `([^`]+)` \|', open('docs/FILE_INVENTORY.md').read(), re.M))
+          tracked = set(subprocess.run(['git', 'ls-files'], capture_output=True, text=True, check=True).stdout.split())
+          missing = sorted(tracked - listed)
+          stale = sorted(p for p in listed - tracked
+                         if not os.path.exists(p)
+                         and subprocess.run(['git', 'check-ignore', '-q', p]).returncode != 0)
+          if missing or stale:
+              raise SystemExit(f'FILE_INVENTORY.md out of date. Missing: {missing} Stale: {stale}')
+          PY
       - name: Check formatting
         run: test -z "$(gofmt -l $(git ls-files '*.go'))"
       - name: Initialize disposable database only

@@ -379,3 +379,57 @@ func (s *Service) reviewLeave(ctx context.Context, q Query, id, state string) er
 	}
 	return nil
 }
+
+// 4A: both the review and optional replacement commit together.
+type LeaveReviewInput struct {
+	Status   string `json:"status"`
+	WorkerID string `json:"replacement_worker_id"`
+}
+
+func (s *Service) ReviewLeaveAndReplace(ctx context.Context, id string, in LeaveReviewInput) ([]string, error) {
+	if e := validID(id, "request_id"); e != nil {
+		return nil, e
+	}
+	if in.Status != "approved" && in.Status != "rejected" {
+		return nil, invalid("status", "approved or rejected required")
+	}
+	if in.WorkerID != "" {
+		if e := validID(in.WorkerID, "replacement_worker_id"); e != nil {
+			return nil, e
+		}
+		if in.Status != "approved" {
+			return nil, invalid("replacement_worker_id", "only permitted with approval")
+		}
+	}
+	var ids []string
+	err := s.Repo.Transaction(ctx, func(q Query) error {
+		if e := s.reviewLeave(ctx, q, id, in.Status); e != nil {
+			return e
+		}
+		if in.WorkerID == "" {
+			return nil
+		}
+		var state, original string
+		var plan ScheduleInput
+		if e := q.QueryRow(ctx, query64, id).Scan(&state, &plan.AssignmentID, &plan.WorkDate, &plan.Start, &original); e != nil {
+			return e
+		}
+		if original == in.WorkerID {
+			return conflict("replacement must be a different worker")
+		}
+		plan.WorkerIDs = []string{in.WorkerID}
+		var e error
+		ids, e = s.schedule(ctx, q, plan)
+		return e
+	})
+	if err == nil {
+		s.Event("leave_review", id)
+		for _, schedule := range ids {
+			s.Event("schedule", schedule)
+		}
+		if in.Status == "approved" && len(ids) == 0 {
+			s.Event("replacement_needed", id)
+		}
+	}
+	return ids, err
+}

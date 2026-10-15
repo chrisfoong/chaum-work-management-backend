@@ -2,7 +2,7 @@
 
 Generated from the class/SD mapping of the historical class package. For each sequence diagram (SD) it lists the participants and the operations they receive, in the original naming.
 
-> **Read with care.** Names here are from the *historical* snapshot. Apply the overrides in `docs/02_domain_model.md` §5 and `docs/04_decisions_and_corrections.md` §1 (payroll names, 5W status, 5S/6S/7W/2A corrections). `…` means omitted literal arguments, not a parameter. Operations list *what is received*; they are not SQL. Original call text is in `docs/references/Class_Reference_Mapping_HISTORICAL.md`.
+> **Read with care.** Names here are from the *historical* snapshot. Apply the overrides in `docs/historical/02_domain_model.md` §5 and `docs/historical/04_decisions_and_corrections.md` §1 (payroll names, 5W status, 5S/6S/7W/2A corrections). `…` means omitted literal arguments, not a parameter. Operations list *what is received*; they are not SQL. Original call text is in `docs/references/Class_Reference_Mapping_HISTORICAL.md`.
 
 Role legend: Boundary = UI, Control = controller, Repository = data access, Service = infrastructure/job.
 
