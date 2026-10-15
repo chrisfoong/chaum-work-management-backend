@@ -2,6 +2,7 @@ package contract
 
 import (
 	"fmt"
+	"math"
 	"regexp"
 	"strings"
 	"time"
@@ -85,6 +86,16 @@ func ValidateScopeFormat(s Scope) []apperr.FieldError {
 		default:
 			errs.checkText(p+".new_location.name", a.NewLocation.Name)
 			errs.checkText(p+".new_location.address", a.NewLocation.Address)
+			loc := a.NewLocation
+			if (loc.Latitude == nil) != (loc.Longitude == nil) {
+				errs.add(p+".new_location.coordinates", "latitude and longitude must be provided together")
+			}
+			if loc.Latitude != nil && (math.IsNaN(*loc.Latitude) || math.IsInf(*loc.Latitude, 0) || *loc.Latitude < -90 || *loc.Latitude > 90) {
+				errs.add(p+".new_location.latitude", "must be between -90 and 90")
+			}
+			if loc.Longitude != nil && (math.IsNaN(*loc.Longitude) || math.IsInf(*loc.Longitude, 0) || *loc.Longitude < -180 || *loc.Longitude > 180) {
+				errs.add(p+".new_location.longitude", "must be between -180 and 180")
+			}
 			if a.NewLocation.Name == "" {
 				break
 			}

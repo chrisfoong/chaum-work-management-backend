@@ -41,8 +41,10 @@ type Area struct {
 
 // NewLocation is a location to create (uc 1S "เพิ่มสถานที่ใหม่").
 type NewLocation struct {
-	Name    string `json:"name"`
-	Address string `json:"address"`
+	Name      string   `json:"name"`
+	Address   string   `json:"address"`
+	Latitude  *float64 `json:"latitude,omitempty"`
+	Longitude *float64 `json:"longitude,omitempty"`
 }
 
 // Item is one equipment line of an area's initial requisition.
@@ -126,8 +128,9 @@ func (s Scope) normalized() Scope {
 		a.LocationID = strings.TrimSpace(a.LocationID)
 		if a.NewLocation != nil {
 			a.NewLocation = &NewLocation{
-				Name:    strings.TrimSpace(a.NewLocation.Name),
-				Address: strings.TrimSpace(a.NewLocation.Address),
+				Name:     strings.TrimSpace(a.NewLocation.Name),
+				Address:  strings.TrimSpace(a.NewLocation.Address),
+				Latitude: a.NewLocation.Latitude, Longitude: a.NewLocation.Longitude,
 			}
 		}
 		items := make([]Item, len(a.Items))

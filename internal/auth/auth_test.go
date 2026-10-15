@@ -6,8 +6,12 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"errors"
+	"fmt"
+	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -250,5 +254,67 @@ func TestUserStore(t *testing.T) {
 				t.Fatalf("principal = %+v", p)
 			}
 		})
+	}
+}
+
+func TestVerificationNetworkFailureDoesNotExpireSession(t *testing.T) {
+	for _, failure := range []error{
+		fmt.Errorf("verify: %w", context.DeadlineExceeded),
+		&net.OpError{Op: "dial", Net: "tcp", Err: errors.New("unreachable")},
+	} {
+		r := gin.New()
+		resolve := func(context.Context, string) (Principal, error) {
+			t.Fatal("resolver must not run before verification succeeds")
+			return Principal{}, nil
+		}
+		r.GET("/x", Authenticate(verifierFunc(func(context.Context, string) (string, error) { return "", failure }), resolve, RoleSupervisor), func(c *gin.Context) { t.Fatal("handler must not run without verified identity") })
+		request := httptest.NewRequest(http.MethodGet, "/x", nil)
+		request.Header.Set("Authorization", "Bearer fake")
+		response := httptest.NewRecorder()
+		r.ServeHTTP(response, request)
+		if response.Code != http.StatusServiceUnavailable {
+			t.Fatalf("status = %d, want 503", response.Code)
+		}
+	}
+}
+
+type lineRoundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f lineRoundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+func TestLineTransportRetryRemainsBounded(t *testing.T) {
+	for _, recover := range []bool{true, false} {
+		calls := 0
+		v := NewLineVerifier("chan")
+		v.client = &http.Client{Transport: lineRoundTripFunc(func(*http.Request) (*http.Response, error) {
+			calls++
+			if calls == 1 || !recover {
+				return nil, &net.OpError{Op: "dial", Net: "tcp", Err: errors.New("network unavailable")}
+			}
+			return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(fmt.Sprintf(`{"sub":"verified-subject","aud":"chan","iss":"https://access.line.me","exp":%d}`, time.Now().Add(time.Hour).Unix())))}, nil
+		})}
+		subject, err := v.Verify(context.Background(), "test-token")
+		if calls != 2 {
+			t.Fatalf("calls=%d, want 2", calls)
+		}
+		if recover && (err != nil || subject != "verified-subject") {
+			t.Fatal("valid identity was not verified after temporary transport failure")
+		}
+		if !recover && (err == nil || subject != "") {
+			t.Fatal("network failure must not create authenticated identity")
+		}
+	}
+}
+
+func TestLineTokenRejectionIsNotRetried(t *testing.T) {
+	calls := 0
+	v := NewLineVerifier("chan")
+	v.client = &http.Client{Transport: lineRoundTripFunc(func(*http.Request) (*http.Response, error) {
+		calls++
+		return &http.Response{StatusCode: 400, Body: io.NopCloser(strings.NewReader("{}"))}, nil
+	})}
+	subject, err := v.Verify(context.Background(), "invalid-token")
+	if calls != 1 || err == nil || subject != "" {
+		t.Fatal("rejected token must fail without retry")
 	}
 }

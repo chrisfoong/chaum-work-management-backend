@@ -39,3 +39,7 @@ GitHub Actions in .github/workflows/backend.yml runs the full isolated PostgreSQ
 Use Case completeness and exact Backend function/API mapping: [docs/USECASE_AUDIT.md](docs/USECASE_AUDIT.md). Latest audit adds notification-only resend/status, selected-area continuation, schedule address/status, accurate 2A/7A prerequisites and financial detail arrays. Tests are local/isolated; deployed LINE/Storage/QR integration remains unverified. 9A history is explicitly outside MVP; current operational reports and manual Supervisor notifications use the existing 16 tables.
 
 9A MVP queries current operational data with Assistant `GET /api/web/assignments/:id/operations-summary` and Supervisor manual `POST /api/web/contracts/:id/operations-summary/notify`. No financials in the Assistant report, no automatic summary after payroll/profit, no new tables or send/read history. Set the real HTTPS ASSISTANT_DASHBOARD_URL privately; see API.md for dates/review guards and delivery limitations.
+
+## Native dev / Docker Compose
+
+ดู [คู่มือเปิด Backend](DEV_DOCKER.md) สำหรับ Go dev server, Docker build และการเปิด Frontend/Backend คู่กัน

@@ -68,7 +68,7 @@ func (f *fakeStore) CreateContract(context.Context, db.DBTX, uuid.UUID, Contract
 	f.call("createContract")
 	return uuid.New(), f.createContractErr
 }
-func (f *fakeStore) CreateLocation(context.Context, db.DBTX, string, string) (uuid.UUID, error) {
+func (f *fakeStore) CreateLocation(context.Context, db.DBTX, string, string, ...*float64) (uuid.UUID, error) {
 	f.call("createLocation")
 	if f.dupLocationName {
 		return uuid.Nil, pgUnique(constraintLocationName)

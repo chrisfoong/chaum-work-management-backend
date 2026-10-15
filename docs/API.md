@@ -74,3 +74,8 @@ Assistant POST /api/web/requisitions/:id/purchase/preview uses PurchaseInput and
 - Empty report has has_data=false plus that message; non-operable contract remains visible but can_continue=false with “กรุณาติดต่อผู้ควบคุมงานเพื่อตรวจสอบสัญญาก่อนดำเนินงานต่อ”. Existing Backend scheduling guards still apply.
 
 All routes retain verified LINE authentication and DB role restrictions. Worker and Assistant cannot trigger the Supervisor command; Supervisor financial report routes remain denied to Assistant.
+
+
+## TOR equipment selector — 2026-10-14
+
+GET /equipment?assignment_id=UUID lists distinct active initial TOR equipment across the selected assignment TOR, filtering before pagination. Worker must have a non-cancelled schedule for the assignment; a different Worker is denied. Without assignment_id the existing catalog read remains unchanged. This read filter does not change additional-request business validation or create schema fields.

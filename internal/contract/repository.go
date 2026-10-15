@@ -60,7 +60,7 @@ func (TORRepository) CreateContract(ctx context.Context, q db.DBTX, userID uuid.
 }
 
 // CreateLocation is Q1S.3.1.
-func (TORRepository) CreateLocation(ctx context.Context, q db.DBTX, name, address string) (uuid.UUID, error) {
+func (TORRepository) CreateLocation(ctx context.Context, q db.DBTX, name, address string, coordinates ...*float64) (uuid.UUID, error) {
 	if _, err := q.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended('catalog:location',0))`); err != nil {
 		return uuid.Nil, err
 	}
@@ -71,10 +71,16 @@ func (TORRepository) CreateLocation(ctx context.Context, q db.DBTX, name, addres
 	if exists {
 		return uuid.Nil, errDuplicateLocation
 	}
+	var lat, lon *float64
+	if len(coordinates) == 2 {
+		lat, lon = coordinates[0], coordinates[1]
+	} else if len(coordinates) != 0 {
+		return uuid.Nil, fmt.Errorf("invalid coordinate pair")
+	}
 	var id uuid.UUID
 	err := q.QueryRow(ctx,
-		`INSERT INTO location (location_name, address) VALUES ($1, $2) RETURNING location_id`,
-		name, address,
+		`INSERT INTO location (location_name, address, latitude, longitude) VALUES ($1, $2, $3, $4) RETURNING location_id`,
+		name, address, lat, lon,
 	).Scan(&id)
 	if err != nil {
 		return uuid.Nil, fmt.Errorf("create location: %w", err)

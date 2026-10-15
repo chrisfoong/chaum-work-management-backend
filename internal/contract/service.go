@@ -30,7 +30,7 @@ type Store interface {
 	ValidateLocation(ctx context.Context, q db.DBTX, locationID uuid.UUID) (bool, error)
 	CheckDuplicateLocationName(ctx context.Context, q db.DBTX, name string) (bool, error)
 	CreateContract(ctx context.Context, q db.DBTX, userID uuid.UUID, c ContractInfo) (uuid.UUID, error)
-	CreateLocation(ctx context.Context, q db.DBTX, name, address string) (uuid.UUID, error)
+	CreateLocation(ctx context.Context, q db.DBTX, name, address string, coordinates ...*float64) (uuid.UUID, error)
 	CreateTORLocationAssignment(ctx context.Context, q db.DBTX, torID, locationID uuid.UUID, requiredWorkers int) (uuid.UUID, string, error)
 	NextRequisitionSeq(ctx context.Context, q db.DBTX, prefix string) (int, error)
 	CreateInitialRequisition(ctx context.Context, q db.DBTX, assignmentID, userID uuid.UUID, requisitionNo string) (uuid.UUID, error)
@@ -214,7 +214,7 @@ func (s *Service) confirmInTx(ctx context.Context, q db.DBTX, userID uuid.UUID, 
 func (s *Service) createArea(ctx context.Context, q db.DBTX, userID, torID uuid.UUID, i int, a Area, requisitionNo string) (ConfirmedArea, error) {
 	var locationID uuid.UUID
 	if a.NewLocation != nil {
-		id, err := s.store.CreateLocation(ctx, q, a.NewLocation.Name, a.NewLocation.Address)
+		id, err := s.store.CreateLocation(ctx, q, a.NewLocation.Name, a.NewLocation.Address, a.NewLocation.Latitude, a.NewLocation.Longitude)
 		if errors.Is(err, errDuplicateLocation) {
 			return ConfirmedArea{}, duplicateLocationName(i)
 		}

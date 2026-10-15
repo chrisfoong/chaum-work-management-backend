@@ -72,6 +72,7 @@ func Run() error {
 	}
 	contract.RegisterRoutes(r.Web, contract.NewHandler(torService))
 	work.Register(r.Web, r.Worker, svc)
+	work.RegisterOnboarding(r.Engine, auth.NewLineVerifier(cfg.WebChannel), auth.NewLineVerifier(cfg.WorkerChannel), svc)
 	r.Web.POST("/files", files.Upload)
 	r.Worker.POST("/files", files.Upload)
 	r.Web.GET("/files", files.Read(svc))

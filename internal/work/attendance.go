@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"math"
 	"strings"
 	"time"
@@ -171,13 +172,18 @@ func (s *Service) CheckOut(ctx context.Context, p auth.Principal, in CheckOut) e
 			return e
 		}
 		var status string
-		if e = s.Repo.Row(ctx, q, query5, in.ScheduleID, worker).Scan(&status); e != nil {
+		var shiftEnd time.Time
+		if e = s.Repo.Row(ctx, q, query5, in.ScheduleID, worker).Scan(&status, &shiftEnd); e != nil {
 			return e
 		}
 		if status != "scheduled" {
 			return conflict("shift not open")
 		}
-		tag, e := s.Repo.Exec(ctx, q, query6, in.ScheduleID, worker, s.Now())
+		now := s.Now()
+		if now.Before(shiftEnd) {
+			return conflict(fmt.Sprintf("ยังไม่ถึงเวลาจบกะ เช็กเอาท์ได้ตั้งแต่ %s (เวลาไทย)", shiftEnd.In(Bangkok).Format("02/01/2006 15:04")))
+		}
+		tag, e := s.Repo.Exec(ctx, q, query6, in.ScheduleID, worker, now)
 		if e != nil {
 			return e
 		}

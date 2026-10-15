@@ -55,3 +55,8 @@ Keep exactly the existing 16 tables. No audit_events, outbox_events, summary sna
 Supervisor explicitly reviews 5S/6S and manually triggers a short LINE project/period message with an HTTPS Assistant dashboard link. No Assistant summary is automatically sent from PayrollBatch or CloseSummary. Manual command requires a closed period, source data, payroll coverage for scheduled workers and supervisor_reviewed=true; 6S is recomputed, but prior human review is an attestation because no confirmation ledger exists.
 
 No source records in the selected period returns has_data=false and “ยังไม่มีข้อมูลสรุปสำหรับรอบนี้”. An inactive/ended/expired contract returns can_continue=false and “กรุณาติดต่อผู้ควบคุมงานเพื่อตรวจสอบสัญญาก่อนดำเนินงานต่อ”. Frontend disables new schedules; Backend still rejects them. No database schema change is needed.
+
+
+## Checkout end-time policy confirmed 2026-10-14
+
+Worker checkout must wait until the scheduled start plus exactly eight hours, calculated in Bangkok on the server. Late check-in does not shift the scheduled end. Exact end boundary and later checkout are accepted subject to existing identity/ownership/photo/duplicate guards. Early checkout must not alter attendance, shift status or evidence. Unclosed checked-in overnight shifts remain visible after the end until checkout.

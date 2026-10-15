@@ -7,6 +7,7 @@ package auth
 import (
 	"context"
 	"errors"
+	"net"
 	"slices"
 	"strings"
 
@@ -66,6 +67,11 @@ func Authenticate(v Verifier, resolve Resolver, allowed ...Role) gin.HandlerFunc
 		}
 		subject, err := v.Verify(c.Request.Context(), token)
 		if err != nil {
+			var networkError net.Error
+			if errors.Is(err, ErrVerificationUnavailable) || errors.Is(err, context.DeadlineExceeded) || errors.As(err, &networkError) {
+				httpx.WriteError(c, apperr.Unavailable("LINE verification is temporarily unavailable; please retry"))
+				return
+			}
 			httpx.WriteError(c, apperr.Unauthorized("invalid or expired token"))
 			return
 		}

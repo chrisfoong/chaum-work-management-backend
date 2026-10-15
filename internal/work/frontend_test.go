@@ -154,3 +154,90 @@ func TestIntegrationFrontendReadModelsAndDeliveryGuards(t *testing.T) {
 		t.Fatal("duplicate mapping silently hidden by paging")
 	}
 }
+
+func TestIntegrationDashboardShowsOnlyCurrentWork(t *testing.T) {
+	f := fixtureUsecases(t)
+	ctx := context.Background()
+	read := func() struct {
+		Open    int `json:"open_contracts"`
+		Pending []struct {
+			ID     string `json:"requisition_id"`
+			Status string `json:"status"`
+		} `json:"pending_requisitions"`
+		Contracts []struct {
+			ID     string `json:"tor_id"`
+			Number string `json:"contract_no"`
+		} `json:"contracts"`
+	} {
+		t.Helper()
+		data, err := f.service.Dashboard(ctx, f.supervisor)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var result struct {
+			Open    int `json:"open_contracts"`
+			Pending []struct {
+				ID     string `json:"requisition_id"`
+				Status string `json:"status"`
+			} `json:"pending_requisitions"`
+			Contracts []struct {
+				ID     string `json:"tor_id"`
+				Number string `json:"contract_no"`
+			} `json:"contracts"`
+		}
+		if err := json.Unmarshal(data, &result); err != nil {
+			t.Fatal(err)
+		}
+		return result
+	}
+	before := read()
+	found := false
+	for _, c := range before.Contracts {
+		if c.ID == f.tor {
+			found = c.Number != ""
+		}
+	}
+	if !found {
+		t.Fatal("dashboard must include the actual contract number")
+	}
+	if _, err := f.pool.Exec(ctx, `UPDATE contract_tor SET start_date='2026-11-01',end_date='2026-11-30' WHERE tor_id=$1`, f.tor); err != nil {
+		t.Fatal(err)
+	}
+	if after := read(); after.Open != before.Open-1 {
+		t.Fatal("future contract counted as operating", before.Open, after.Open)
+	}
+	if _, err := f.pool.Exec(ctx, `UPDATE contract_tor SET start_date='2026-09-01',end_date='2026-09-30' WHERE tor_id=$1`, f.tor); err != nil {
+		t.Fatal(err)
+	}
+	if after := read(); after.Open != before.Open-1 {
+		t.Fatal("expired contract counted as operating")
+	}
+	if _, err := f.pool.Exec(ctx, `UPDATE contract_tor SET status='registered',start_date='2026-10-01',end_date='2026-10-31' WHERE tor_id=$1`, f.tor); err != nil {
+		t.Fatal(err)
+	}
+	if after := read(); after.Open != before.Open-1 {
+		t.Fatal("registered contract counted as operating")
+	}
+	var pendingID string
+	if err := f.pool.QueryRow(ctx, `INSERT INTO equipment_requisition(requisition_no,requested_by,assignment_id,reason,requisition_type,status) VALUES($1,$2,$3,'dashboard','tor_base','pending_survey') RETURNING requisition_id::text`, uuid.NewString(), f.supervisor.UserID, f.assignment).Scan(&pendingID); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 6; i++ {
+		if _, err := f.pool.Exec(ctx, `INSERT INTO equipment_requisition(requisition_no,requested_by,assignment_id,reason,requisition_type,status) VALUES($1,$2,$3,'finished','tor_base','completed')`, uuid.NewString(), f.supervisor.UserID, f.assignment); err != nil {
+			t.Fatal(err)
+		}
+	}
+	after := read()
+	found = false
+	for _, r := range after.Pending {
+		if r.Status == "completed" || r.Status == "rejected" {
+			t.Fatal("terminal request shown as pending")
+		}
+		if r.ID == pendingID {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("newer completed requests must not hide pending work")
+	}
+}

@@ -40,9 +40,15 @@ func Register(web, worker *gin.RouterGroup, s *Service) {
 			out, e := s.RequisitionDetail(c.Request.Context(), actor(c), c.Param("id"))
 			respond(c, out, e)
 		})
-		g.GET("/equipment", list(func(ctx context.Context, _ auth.Principal, l, o int) (json.RawMessage, error) {
-			return s.Equipments(ctx, l, o)
-		}))
+		g.GET("/equipment", func(c *gin.Context) {
+			l, o, e := paging(c)
+			if e != nil {
+				respond(c, nil, e)
+				return
+			}
+			out, e := s.AssignmentEquipment(c.Request.Context(), actor(c), c.Query("assignment_id"), l, o)
+			respond(c, out, e)
+		})
 	}
 	web.GET("/contracts", list(func(ctx context.Context, _ auth.Principal, l, o int) (json.RawMessage, error) {
 		return s.Contracts(ctx, l, o)
@@ -53,6 +59,16 @@ func Register(web, worker *gin.RouterGroup, s *Service) {
 	}))
 	sup := web.Group("", auth.RequireRole(auth.RoleSupervisor))
 	asst := web.Group("", auth.RequireRole(auth.RoleAssistant))
+	sup.POST("/invitations", input(func(c *gin.Context, p auth.Principal, in InvitationUserInput) (any, error) {
+		return s.CreateInvitation(c.Request.Context(), p, in)
+	}))
+	sup.POST("/users/:id/invitation", input(func(c *gin.Context, p auth.Principal, _ struct{}) (any, error) {
+		return s.RenewInvitation(c.Request.Context(), p, c.Param("id"))
+	}))
+
+	sup.POST("/users/:id/invitation/cancel", input(func(c *gin.Context, p auth.Principal, _ struct{}) (any, error) {
+		return s.CancelInvitation(c.Request.Context(), p, c.Param("id"))
+	}))
 	sup.POST("/users", input(func(c *gin.Context, p auth.Principal, in UserInput) (any, error) {
 		return s.CreateUser(c.Request.Context(), p, in)
 	}))

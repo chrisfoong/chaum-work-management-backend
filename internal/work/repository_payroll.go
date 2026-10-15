@@ -2,7 +2,9 @@ package work
 
 // Exported-schema SQL for payroll.
 const (
-	query29 = `SELECT daily_wage::text FROM public."USER" WHERE user_id=$1 AND role='worker'`
+	// Historical scheduled work remains payable after a role change.
+	// preview already requires a unique Worker mapping; route authorization stays Supervisor-only.
+	query29 = `SELECT daily_wage::text FROM public."USER" WHERE user_id=$1`
 	query30 = `SELECT s.schedule_id::text,s.work_date::text,s.shift_start_time::text,a.attendance_id::text,a.status::text,a.check_in,EXISTS(SELECT 1 FROM leave_request l WHERE l.user_id=$1 AND l.leave_date=s.work_date AND l.status='approved' AND l.is_advance_notice) FROM work_schedule s LEFT JOIN attendance a ON a.schedule_id=s.schedule_id AND a.worker_id=s.worker_id AND a.work_date=s.work_date WHERE s.worker_id=$2 AND s.work_date BETWEEN $3::date AND $4::date AND s.shift_status<>'cancelled' ORDER BY s.work_date,s.schedule_id`
 	query31 = `SELECT EXISTS(SELECT 1 FROM payroll WHERE user_id=$1 AND period_start<=$3::date AND period_end>=$2::date)`
 	query32 = `INSERT INTO payroll(payroll_slip_no,user_id,managed_by_id,period_start,period_end,base_wage,total_deduction,net_wage) VALUES($1,$2,$3,$4::date,$5::date,$6::numeric,$7::numeric,$8::numeric) RETURNING payroll_id::text`

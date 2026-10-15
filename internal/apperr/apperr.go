@@ -13,6 +13,7 @@ const (
 	KindForbidden
 	KindNotFound
 	KindConflict
+	KindUnavailable
 )
 
 // FieldError names one failing input field.
@@ -76,6 +77,11 @@ func Internal(err error) *Error {
 	return &Error{Kind: KindInternal, Code: "internal", Message: "internal server error", Err: err}
 }
 
+// Unavailable reports a temporary dependency failure without exposing credentials.
+func Unavailable(msg string) *Error {
+	return &Error{Kind: KindUnavailable, Code: "service_unavailable", Message: msg}
+}
+
 // HTTPStatus returns the status code for a kind.
 func HTTPStatus(k Kind) int {
 	switch k {
@@ -89,6 +95,8 @@ func HTTPStatus(k Kind) int {
 		return http.StatusNotFound
 	case KindConflict:
 		return http.StatusConflict
+	case KindUnavailable:
+		return http.StatusServiceUnavailable
 	default:
 		return http.StatusInternalServerError
 	}

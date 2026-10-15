@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -31,8 +32,20 @@ func NewLineVerifier(channelID string) *LineVerifier {
 	}
 }
 
+// ErrVerificationUnavailable identifies a temporary LINE service failure.
+var ErrVerificationUnavailable = errors.New("LINE verification service unavailable")
+
 // Verify sends the ID token to LINE and returns the LINE user id (sub).
 func (v *LineVerifier) Verify(ctx context.Context, idToken string) (string, error) {
+	subject, err := v.verifyOnce(ctx, idToken)
+	var networkError net.Error
+	if err != nil && ctx.Err() == nil && (errors.Is(err, context.DeadlineExceeded) || errors.As(err, &networkError)) {
+		return v.verifyOnce(ctx, idToken)
+	}
+	return subject, err
+}
+
+func (v *LineVerifier) verifyOnce(ctx context.Context, idToken string) (string, error) {
 	if v.channelID == "" || idToken == "" {
 		return "", errors.New("LINE verifier is not configured or token is empty")
 	}
@@ -49,6 +62,9 @@ func (v *LineVerifier) Verify(ctx context.Context, idToken string) (string, erro
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode >= 500 {
+		return "", fmt.Errorf("%w: status %d", ErrVerificationUnavailable, resp.StatusCode)
+	}
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("LINE rejected ID token: status %d", resp.StatusCode)
 	}

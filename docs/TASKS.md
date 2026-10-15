@@ -194,3 +194,58 @@ Evidence: task workspace backend-final-tests.jsonl, backend-final-coverage.out a
 - [x] Paired startup/acceptance guide: SERVER_AND_TEST_STATUS.md (Backend 8080, Frontend 5500, LINE tunnel).
 - [x] Latest rerun: 235 tests/subtests, 0 failures/test skips on isolated PostgreSQL; vet/build passed. Live LINE roles and QR issuance/expiry verified; shared test mapping deleted and Supervisor restored.
 - [ ] Populated procurement/funding/delivery, Storage transfer, physical GPS+camera attendance/checkout, payroll/payment/export and actual LINE recipient delivery remain live-unverified. Historical pending-login notes are superseded by this handoff; mock tests are separate evidence.
+
+## Dev / Docker — 2026-10-10
+
+- เพิ่ม Dockerfile แบบ multi-stage, non-root runtime, Compose healthcheck และคู่มือ DEV_DOCKER.md
+- Docker build ผ่าน; container backend health HTTP 200 บนพอร์ตทดสอบ 8081
+- ใช้ config Supabase เดิม ไม่มี database container/migration/reset; ผล build/health ไม่ใช่ผลทดสอบครบทุก use case
+- ตรวจซ้ำ go test ./..., go vet ./..., go build ./... ผ่าน; integration ที่ skip ไม่ถือว่าผ่านจริง
+
+## Live export / 9A check — 2026-10-10
+
+- Profit PDF/CSV ดาวน์โหลดจาก UI จริง เปิดไฟล์ ตรวจ TOR/ช่วงวันที่/ยอด 0, 0, 300, -300 ตรงกับรายงานรอบ 1–10 ต.ค.
+- 9A manual POST รอบ TEST 16–30 ก.ย. HTTP 200 แต่ notification failed ไม่ใช่ delivery success; active Assistant 1 บัญชีมี LINE ID ผิดรูปแบบ
+- ผู้ใช้มีเฉพาะ LINE บัญชีเดิมซึ่งคืน Supervisor แล้ว จึงยังไม่มีผู้รับ Assistant จริงแยก; ไม่ข้าม authorization หรือแก้ recipient role เพื่อให้ผลผ่าน
+- Physical phone TEST shift เช็กอิน 17:10:10 / เช็กเอาท์ 17:12:35 เวลาไทย, completed; checkout evidence PNG อ่านจาก Storage HTTP 200
+
+## 2026-10-10 Dashboard and acceptance audit
+
+- Dashboard only counts active contracts within their date range, returns contract numbers and filters terminal requisitions before selecting pending work.
+- Added integration regression covering future/expired/registered contract counts and completed requests not hiding pending work.
+- 242 tests/subtests passed, no failures or skipped tests, on isolated localhost PostgreSQL; vet/build passed.
+- Live exports and physical check-in/out are documented separately from mocked transport tests. See [UI_ACCEPTANCE_20261010.md](UI_ACCEPTANCE_20261010.md) for all 22 use cases and outstanding live verification.
+- No schema changes, no authentication bypass, no assertion that LINE acceptance means real recipient delivery.
+
+## 2026-10-14: LINE invitation onboarding (no ER change)
+
+- Replaced the prepared registration-request approach with Supervisor-issued invitations using existing USER/WORKER columns only; no Supabase DDL or new table.
+- Added creation/renewal, verified-LINE preview/claim, 24-hour expiry, one-time consumption and inactive-account protection. Pending users have no business access or Worker mapping.
+- Frontend creates/copies LIFF links, preserves invitation fragments through redirects, removes manual LINE subject entry, and displays pending LINE binding separately from suspension.
+- Verified backend go test ./... against isolated loopback PostgreSQL, go vet/build; frontend lint/typecheck/format, 35 tests; production Docker builds and both services healthy (5501/8081).
+- Preview browser check passed on desktop/mobile: three roles and no LINE subject field. This is visual evidence only. A real separate LINE recipient still needs to complete the mobile claim flow before claiming live end-to-end acceptance.
+- Full instructions: docs/ONBOARDING.md. No push/merge performed.
+
+## 2026-10-14: Cancel LINE invitations
+
+Supervisor can cancel the current unclaimed invitation without deleting personnel or changing ER. Cancelled accounts can be re-invited; linked accounts cannot be deactivated through cancellation. Added transaction/row-lock race coverage and UI confirmation/status labels. Tests run on isolated loopback PostgreSQL, not shared Supabase.
+
+
+## New TOR location coordinates — 2026-10-14
+
+Extended new_location with optional paired latitude/longitude for backward compatibility. Normalization retains them; scope validates finite geographic bounds; location insertion stores both atomically with TOR in existing columns. No DDL/ER changes. Full go test ./... with isolated loopback PostgreSQL, go vet and go build passed. New validation and isolated persistence regression tests passed without skips. No live Supabase TOR was created for this change.
+
+
+## TOR-scoped Worker equipment read — 2026-10-14
+
+Implemented assignment_id filter, ownership guard and DISTINCT-by-EXISTS initial TOR equipment read. Full isolated Backend tests, go vet and build passed; new regression covers exclusion of unrelated equipment, ownership denial, invalid assignment, pagination and inactive equipment. No Supabase mutation test or schema change.
+
+
+## Verified onboarding platform routing — 2026-10-14
+
+Registered onboarding responses include platform derived from current database role (Worker -> worker, Supervisor/Assistant -> web). Inactive/unknown responses do not supply an authorized destination. Identity middleware and application role/audience guards remain unchanged. Full isolated tests, go vet/build and Docker production build passed; regression checks all three roles and inactive users. No schema change or Supabase mutation.
+
+
+## Early checkout defect — 2026-10-14
+
+Live read confirmed requested Worker checked in at 20:07 and checked out at 20:39 for 18:00-02:00 shift; historical record preserved as evidence. Added scheduled-end server guard and retained unclosed overnight read. Full isolated tests/vet/build passed; regression rejects 23:00 and one nanosecond before 04:00 for 20:00-04:00 shift, verifies no evidence/status/checkout writes on rejection, and accepts exact end. No shared DB mutation. User reports TOR equipment filter, real GPS/QR and additional request test exercised; live request is pending_procurement. New real-mobile checkout policy still requires verification.

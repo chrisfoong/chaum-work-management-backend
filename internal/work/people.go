@@ -89,6 +89,16 @@ func (s *Service) UpdateUser(ctx context.Context, id string, in UserUpdate) erro
 		if e := lock(ctx, q, "worker:"+id); e != nil {
 			return e
 		}
+
+		if in.Active != nil && *in.Active {
+			var pending bool
+			if err := q.QueryRow(ctx, `SELECT (line_id LIKE 'INV:%' OR line_id LIKE 'CNL:%') FROM public."USER" WHERE user_id=$1`, id).Scan(&pending); err != nil {
+				return err
+			}
+			if pending {
+				return conflict("ต้องผูกบัญชี LINE ผ่านลิงก์เชิญก่อนเปิดใช้งาน")
+			}
+		}
 		tag, e := s.Repo.Exec(ctx, q, query44, id, in.FirstName, in.LastName, Decimal(w), in.Active)
 		if e != nil {
 			return e
