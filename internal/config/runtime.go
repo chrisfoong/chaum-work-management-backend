@@ -12,7 +12,11 @@ type Runtime struct {
 }
 
 func LoadRuntime(get func(string) string) (Runtime, error) {
-	c := Runtime{Port: get("PORT"), DatabaseURL: get("DATABASE_URL"), WebChannel: get("LINE_WEB_CHANNEL_ID"), WorkerChannel: get("LINE_WORKER_CHANNEL_ID"), ProviderID: get("LINE_PROVIDER_ID"), QRSecret: get("QR_SIGNING_SECRET"), StorageURL: strings.TrimRight(get("SUPABASE_URL"), "/"), StorageKey: get("SUPABASE_SERVICE_ROLE_KEY"), StorageBucket: get("STORAGE_BUCKET"), MessagingToken: get("LINE_MESSAGING_TOKEN")}
+	projectURL, err := supabaseURL(get)
+	if err != nil {
+		return Runtime{}, err
+	}
+	c := Runtime{Port: get("PORT"), DatabaseURL: get("DATABASE_URL"), WebChannel: get("LINE_WEB_CHANNEL_ID"), WorkerChannel: get("LINE_WORKER_CHANNEL_ID"), ProviderID: get("LINE_PROVIDER_ID"), QRSecret: get("QR_SIGNING_SECRET"), StorageURL: projectURL, StorageKey: get("SUPABASE_SERVICE_ROLE_KEY"), StorageBucket: get("STORAGE_BUCKET"), MessagingToken: get("LINE_MESSAGING_TOKEN")}
 	if c.Port == "" {
 		c.Port = "8080"
 	}

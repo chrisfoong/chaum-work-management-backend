@@ -249,3 +249,8 @@ Registered onboarding responses include platform derived from current database r
 ## Early checkout defect — 2026-10-14
 
 Live read confirmed requested Worker checked in at 20:07 and checked out at 20:39 for 18:00-02:00 shift; historical record preserved as evidence. Added scheduled-end server guard and retained unclosed overnight read. Full isolated tests/vet/build passed; regression rejects 23:00 and one nanosecond before 04:00 for 20:00-04:00 shift, verifies no evidence/status/checkout writes on rejection, and accepts exact end. No shared DB mutation. User reports TOR equipment filter, real GPS/QR and additional request test exercised; live request is pending_procurement. New real-mobile checkout policy still requires verification.
+
+
+## Supabase URL aliases — 2026-10-15
+
+Both backend config loaders now resolve canonical SUPABASE_URL and fallback NEXT_PUBLIC_SUPABASE_URL through one helper. Trim surrounding whitespace and trailing slashes, accept matching aliases, and reject conflicting project URLs with variable names only. Service role key remains backend-only; frontend has no direct Supabase client and needs neither URL. Full isolated tests, vet/build and Docker build passed. Tests cover both loaders, alias-only, empty canonical, matching values and mismatches. No private env values modified or logged.

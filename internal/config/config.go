@@ -17,10 +17,14 @@ type Config struct {
 // Load reads the configuration through getenv (os.Getenv in production).
 // It reports every missing required variable by name, never by value.
 func Load(getenv func(string) string) (Config, error) {
+	projectURL, err := supabaseURL(getenv)
+	if err != nil {
+		return Config{}, err
+	}
 	cfg := Config{
 		Port:          getenv("PORT"),
 		DatabaseURL:   getenv("DATABASE_URL"),
-		SupabaseURL:   strings.TrimRight(getenv("SUPABASE_URL"), "/"),
+		SupabaseURL:   projectURL,
 		LineChannelID: getenv("LINE_LOGIN_CHANNEL_ID"),
 	}
 	if cfg.Port == "" {
