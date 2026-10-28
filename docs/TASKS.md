@@ -254,3 +254,10 @@ Live read confirmed requested Worker checked in at 20:07 and checked out at 20:3
 ## Supabase URL aliases — 2026-10-15
 
 Both backend config loaders now resolve canonical SUPABASE_URL and fallback NEXT_PUBLIC_SUPABASE_URL through one helper. Trim surrounding whitespace and trailing slashes, accept matching aliases, and reject conflicting project URLs with variable names only. Service role key remains backend-only; frontend has no direct Supabase client and needs neither URL. Full isolated tests, vet/build and Docker build passed. Tests cover both loaders, alias-only, empty canonical, matching values and mismatches. No private env values modified or logged.
+
+
+## Workflow route refactor — 2026-10-28
+
+`internal/work/handler.go` now wires the existing role groups to domain registration helpers: shared reads, catalog, scheduling/attendance, procurement, and reporting/payroll. All 62 source route registrations and original handler bodies were moved without changing HTTP methods, paths, role middleware, response payloads, services or SQL.
+
+Verification: generated OpenAPI before/after the refactor is identical (70 paths, 81 operations). Existing authorization and full isolated-loopback database tests, gofmt, go vet and go build passed. No Supabase/schema/config changes were made for this refactor.
