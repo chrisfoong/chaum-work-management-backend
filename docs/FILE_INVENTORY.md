@@ -1,6 +1,6 @@
 # Repository file inventory
 
-Updated 2026-10-15 on branch `feature/repo-tidy`. 160 files, including this one and the local-only `.env` and `docs/references/`. Excluded: `.git/` internals. There is no `node_modules/` and no vendored dependencies.
+Updated 2026-10-28 on branch `feature/refactor-workflow-modules`. 165 files, including this one and the local-only `.env` and `docs/references/`. Excluded: `.git/` internals. There is no `node_modules/` and no vendored dependencies.
 
 ## Root
 
@@ -152,7 +152,12 @@ Services and handlers:
 | Path | Purpose |
 |---|---|
 | `internal/work/service.go` | Core work service: transactions, listing and paging, locking, validation helpers and exact money/decimal types. |
-| `internal/work/handler.go` | Registers every work-workflow HTTP route on the web and LIFF groups. |
+| `internal/work/handler.go` | Wires workflow route modules to the existing web, Worker, Supervisor and Assistant groups and middleware. |
+| `internal/work/handler_read.go` | Shared authenticated dashboard, identity, schedule, attendance, requisition and equipment read routes. |
+| `internal/work/handler_catalog.go` | Contract and personnel reads, invitations, catalog writes and assignment listing routes. |
+| `internal/work/handler_scheduling.go` | Assistant scheduling and leave review, Worker attendance, staff QR and Supervisor attendance-finalization routes. |
+| `internal/work/handler_procurement.go` | Equipment-request, inspection, decision, purchase, funding, delivery and notification-retry routes with existing role groups. |
+| `internal/work/handler_reporting.go` | Operational summaries and continuation, payroll, invoices and profit reporting routes with existing role groups. |
 | `internal/work/http_helpers.go` | Shared handler helpers for responses, actor extraction, input binding and pagination. |
 | `internal/work/attendance.go` | Signed QR issuance and checks, GPS checks, check-in/check-out and attendance finalisation. |
 | `internal/work/catalog.go` | Read endpoints for contracts, contract state, locations and equipment. |
