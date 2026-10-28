@@ -124,7 +124,7 @@ No shared Supabase schema/data changes, server startup, deployment or merge. Fro
 - [x] GitHub Write permission is now available; atomic non-force push of all 13 feature branches succeeded. Prior 403 push blockers above are historical and resolved.
 - [x] First hosted CI exposed an existing timezone-dependent overnight assertion (UTC representation versus Bangkok date). Fixed the assertion to parse instants, convert to Bangkok and verify both expected local dates/times plus exactly eight hours.
 - [x] Full isolated local test run repeated with PostgreSQL session timezone=UTC: 198 passed, zero failed/skipped. Runtime shift calculation unchanged.
-- [ ] Draft PR publication: GitHub connector returns 403 Resource not accessible by integration. GitHub browser is signed out; waiting for user login. All branch compare links are in FEATURE_PRS.md. No PR exists from this attempt.
+- [ ] Draft PR publication: GitHub connector returns 403 Resource not accessible by integration. GitHub browser is signed out; waiting for user login. All branch compare links are in historical/pr/FEATURE_PRS.md. No PR exists from this attempt.
 - [ ] Hosted CI rerun must be checked after this correction; do not treat the first failed run as passing.
 
 Auto-review rejected a proposed Git credential-helper extraction for API publication; that script was not executed and was removed. No credential was extracted/displayed. Existing Git push succeeded through its normal credential handling. No .env file inspected; no shared Supabase data/schema changed.

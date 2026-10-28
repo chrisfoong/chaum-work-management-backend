@@ -1,4 +1,4 @@
--- 0001_init: the 16 entities of the production ER (docs/02_domain_model.md).
+-- 0001_init: the 16 entities of the production ER (docs/historical/02_domain_model.md).
 -- NOT APPLIED. Review before running against any database.
 --
 -- Names, types and constraints follow docs/references/datadict.txt; deliberate
