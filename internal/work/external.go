@@ -171,8 +171,11 @@ func (st *Storage) Read(s *Service) gin.HandlerFunc {
 }
 
 type LinePush struct {
-	Token  string
-	Client *http.Client
+	DashboardURL string
+	LogoURL      string
+	WorkerURL    string
+	Token        string
+	Client       *http.Client
 }
 
 func (l *LinePush) Send(ctx context.Context, user, msg string) error {
@@ -184,7 +187,7 @@ func (l *LinePush) SendKey(ctx context.Context, user, msg, retryKey string) erro
 	if l.Token == "" {
 		return conflict("LINE messaging is not configured")
 	}
-	body, _ := json.Marshal(map[string]any{"to": user, "messages": []map[string]string{{"type": "text", "text": msg}}})
+	body, _ := json.Marshal(map[string]any{"to": user, "messages": []map[string]any{l.messageCard(msg)}})
 	client := l.Client
 	if client == nil {
 		client = &http.Client{Timeout: 5 * time.Second}

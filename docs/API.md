@@ -13,7 +13,7 @@ Web /api/web uses verified LINE Web tokens and Supervisor/Assistant; Mini App /a
 
 Lists: limit1-100(default50), offset0-100000(default0); response data/limit/offset. Dates YYYY-MM-DD; months YYYY-MM; money decimal strings; IDs UUID. Payroll periods must match1-15 or16-month end.
 
-Check-in requires schedule_id, qr_token, latitude, longitude and accuracy. Staff assignment QR expires60s and is reusable across workers; one check-in/schedule prevents repeat check-in. All GPS fields required. Check-in is allowed on the scheduled Bangkok calendar day (including before planned start) until the end of the eight-hour shift; overnight continuation remains supported. Early check-in is on_time. Checkout needs owned evidence and description.
+Check-in requires schedule_id, qr_token, latitude, longitude and accuracy. Staff assignment QR expires after 5 minutes (300 seconds) and is reusable across workers; one check-in/schedule prevents repeat check-in. All GPS fields required. Check-in is allowed on the scheduled Bangkok calendar day (including before planned start) until the end of the eight-hour shift; overnight continuation remains supported. Early check-in is on_time. Checkout needs owned evidence and description.
 
 POST /files accepts raw body with Content-Type, not multipart, max5MiB. Worker JPEG/PNG; staff also PDF. Use returned object path, not an external URL. GET /files?path=... enforces access and proxies private storage.
 
@@ -79,3 +79,10 @@ All routes retain verified LINE authentication and DB role restrictions. Worker 
 ## TOR equipment selector — 2026-10-14
 
 GET /equipment?assignment_id=UUID lists distinct active initial TOR equipment across the selected assignment TOR, filtering before pagination. Worker must have a non-cancelled schedule for the assignment; a different Worker is denied. Without assignment_id the existing catalog read remains unchanged. This read filter does not change additional-request business validation or create schema fields.
+
+### LINE card presentation
+Push notifications use Flex Message bubbles with altText, Thai headings and HTTPS actions. LINE_NOTIFICATION_LOGO_URL optionally overrides the public logo; otherwise ASSISTANT_DASHBOARD_URL supplies the origin for /brand/chaum-logo.png (served by Frontend). LINE_WORKER_MINI_APP_URL overrides the Chaum Published Mini App entry URL. Worker events open that Mini App, staff events open ASSISTANT_DASHBOARD_URL, and 9A preserves the business-generated TOR/date URL. Deploy both repositories together for the logo asset. No schema or notification acceptance semantics changed.
+
+Leave-review Flex cards include the committed leave_no, leave_date, original leave reason and explicit approval/rejection heading. Initial events and manual retries share the same persisted-state formatter. Pending requests cannot be announced as reviewed. No new rejection-comment field or schema column is invented.
+
+Worker personal summary is a separate service formatter requested on 2026-10-30; it requires a Worker principal and scopes SQL by that Worker mapping and TOR/date range. It has no public route or automatic notification trigger in this change. Staff 9A authorization is unchanged. Counts are a current personal view, not a project-closing report. Cards open the Worker Mini App entry, not a dedicated summary page.

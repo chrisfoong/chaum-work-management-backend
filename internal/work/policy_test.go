@@ -62,14 +62,18 @@ func TestGPSAndQRBoth(t *testing.T) {
 	now := time.Date(2026, 10, 8, 8, 0, 0, 0, Bangkok)
 	s := &Service{QRSecret: []byte(strings.Repeat("s", 32)), Now: func() time.Time { return now }}
 	id := uuid.NewString()
-	token, e := s.signQR(QRClaims{id, now.Unix(), now.Unix() + 60})
+	token, e := s.signQR(QRClaims{id, now.Unix(), now.Add(5 * time.Minute).Unix()})
 	if e != nil || s.checkQR(token, id) != nil {
 		t.Fatal("valid QR failed")
 	}
 	if s.checkQR(token, uuid.NewString()) == nil || s.checkQR(token+"x", id) == nil {
 		t.Fatal("QR tamper/area accepted")
 	}
-	now = now.Add(time.Minute)
+	now = now.Add(5*time.Minute - time.Second)
+	if s.checkQR(token, id) != nil {
+		t.Fatal("QR expired before five minutes")
+	}
+	now = now.Add(time.Second)
 	if s.checkQR(token, id) == nil {
 		t.Fatal("expired QR accepted")
 	}

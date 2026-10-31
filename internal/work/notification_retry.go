@@ -97,6 +97,12 @@ func (s *Service) RetryNotification(ctx context.Context, p auth.Principal, id st
 	if e != nil {
 		return out, e
 	}
+	if in.Kind == "leave_review" {
+		message, e = s.leaveReviewMessage(ctx, id)
+		if e != nil {
+			return out, e
+		}
+	}
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	for _, user := range users {

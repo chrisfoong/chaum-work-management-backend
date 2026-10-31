@@ -12,7 +12,7 @@ Business source: [SA-Group5 Use Case Descriptions](https://docs.google.com/docum
 
 - 3W permits assigned workers to confirm/check in on the scheduled calendar day before start; 4S classifies early check-in as on_time. Future-day and ended shifts are rejected; overnight continuation remains supported.
 
-- Attendance retains both signed QR (60s) and GPS <=200m through LOCATION/TOR assignment, accuracy <=50m, server timestamps/Bangkok dates.
+- Attendance retains both signed QR (5 minutes / 300 seconds) and GPS <=200m through LOCATION/TOR assignment, accuracy <=50m, server timestamps/Bangkok dates.
 
 - 5W requires current active check-in/no checkout. 5A compares original additional request against base and pending additional requests across the TOR. Historical quantity is not proof of equipment condition.
 

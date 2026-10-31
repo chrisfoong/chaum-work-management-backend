@@ -61,8 +61,12 @@ func Run() error {
 	svc.AssistantDashboardURL = os.Getenv("ASSISTANT_DASHBOARD_URL")
 	files := work.NewStorage(cfg.StorageURL, cfg.StorageKey, cfg.StorageBucket)
 	svc.Files = files
+	workerMiniAppURL := os.Getenv("LINE_WORKER_MINI_APP_URL")
+	if workerMiniAppURL == "" {
+		workerMiniAppURL = "https://miniapp.line.me/2011922658-kb0yFlBE"
+	}
 	if cfg.MessagingToken != "" {
-		svc.Notify = &work.LinePush{Token: cfg.MessagingToken, Client: &http.Client{Timeout: 5 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}
+		svc.Notify = &work.LinePush{DashboardURL: svc.AssistantDashboardURL, LogoURL: os.Getenv("LINE_NOTIFICATION_LOGO_URL"), WorkerURL: workerMiniAppURL, Token: cfg.MessagingToken, Client: &http.Client{Timeout: 5 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}
 	} else {
 		slog.Warn("LINE notifications disabled: messaging token missing")
 	}

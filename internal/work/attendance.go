@@ -13,6 +13,8 @@ import (
 	"time"
 )
 
+const qrLifetime = 5 * time.Minute
+
 type QRClaims struct {
 	Assignment string `json:"assignment_id"`
 	Issued     int64  `json:"iat"`
@@ -55,7 +57,7 @@ func (s *Service) checkQR(token, assignment string) error {
 		return invalid("qr_token", "invalid QR")
 	}
 	now := s.Now().Unix()
-	if c.Assignment != assignment || c.Issued > now || c.Expiry <= now || c.Expiry-c.Issued != 60 {
+	if c.Assignment != assignment || c.Issued > now || c.Expiry <= now || c.Expiry-c.Issued != int64(qrLifetime/time.Second) {
 		return invalid("qr_token", "expired QR or wrong assignment")
 	}
 	return nil
@@ -72,8 +74,8 @@ func (s *Service) QR(ctx context.Context, id string) (map[string]any, error) {
 		return nil, conflict("assignment not available")
 	}
 	now := s.Now()
-	token, e := s.signQR(QRClaims{id, now.Unix(), now.Unix() + 60})
-	return map[string]any{"qr_token": token, "expires_at": now.Add(time.Minute)}, e
+	token, e := s.signQR(QRClaims{id, now.Unix(), now.Add(qrLifetime).Unix()})
+	return map[string]any{"qr_token": token, "expires_at": now.Add(qrLifetime)}, e
 }
 
 type CheckIn struct {
