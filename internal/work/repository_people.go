@@ -28,11 +28,11 @@ const (
 	query64 = `SELECT l.status::text,s.assignment_id::text,s.work_date::text,s.shift_start_time::text,w.worker_id::text FROM leave_request l JOIN worker w ON w.user_id=l.user_id JOIN work_schedule s ON s.worker_id=w.worker_id AND s.work_date=l.leave_date WHERE l.request_id=$1`
 )
 
-// Only unused planned slots may be reassigned. Actual work and financial history
+// Only unused planned slots of closed (cancelled or complete) contracts may be reassigned. Actual work and financial history
 // must never move to another contract, even when the original is cancelled.
 const reusableCancelledSchedule = `s.shift_status IN ('scheduled','cancelled')
  AND s.work_date >= $5::date
- AND EXISTS(SELECT 1 FROM tor_location_assignment a JOIN contract_tor c ON c.tor_id=a.tor_id WHERE a.assignment_id=s.assignment_id AND c.status='cancelled')
+ AND EXISTS(SELECT 1 FROM tor_location_assignment a JOIN contract_tor c ON c.tor_id=a.tor_id WHERE a.assignment_id=s.assignment_id AND c.status IN ('cancelled','complete'))
  AND NOT EXISTS(SELECT 1 FROM attendance x WHERE x.schedule_id=s.schedule_id)
  AND NOT EXISTS(SELECT 1 FROM work_evidence x WHERE x.schedule_id=s.schedule_id)
  AND NOT EXISTS(SELECT 1 FROM leave_request x JOIN worker w ON w.user_id=x.user_id WHERE w.worker_id=s.worker_id AND x.leave_date=s.work_date)

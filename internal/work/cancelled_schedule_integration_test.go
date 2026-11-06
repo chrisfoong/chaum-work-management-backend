@@ -7,8 +7,13 @@ import (
 )
 
 func TestIntegrationReassignUnusedCancelledContract(t *testing.T) {
-	for _, recorded := range []bool{false, true} {
-		t.Run(map[bool]string{false: "unused", true: "leave_history"}[recorded], func(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		state    string
+		recorded bool
+	}{{"unused", "cancelled", false}, {"leave_history", "cancelled", true}, {"complete_unused", "complete", false}} {
+		recorded := tc.recorded
+		t.Run(tc.name, func(t *testing.T) {
 			f := fixtureUsecases(t)
 			target := fixtureUsecases(t)
 			ctx := context.Background()
@@ -22,7 +27,7 @@ func TestIntegrationReassignUnusedCancelledContract(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			if err = f.service.ContractState(ctx, f.tor, "cancelled"); err != nil {
+			if err = f.service.ContractState(ctx, f.tor, tc.state); err != nil {
 				t.Fatal(err)
 			}
 			candidates, err := f.service.AvailableWorkers(ctx, "2026-10-04", "", 1000, 0)
