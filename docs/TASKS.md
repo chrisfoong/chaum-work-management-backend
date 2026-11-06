@@ -296,3 +296,6 @@ Verification: Frontend 48 tests, typecheck, lint, formatting and production buil
 - gofmt, go test -count=1 ./..., go vet ./... and go build ./... passed.
 - Test events: 221 passed, 38 skipped integration tests; skipped tests remain unverified.
 - No shared database test writes, schema changes or secret-file inspection in this verification.
+
+
+2026-11-06: Allow unused same-day slots from cancelled contracts to be reassigned, without schema changes. Attendance, evidence, leave history and calculated payroll block reuse. Targeted isolated PostgreSQL regression tests pass; vet/build pass. Full integration run still fails AtomicAttendanceAndRollback, MVP and PurchaseRoundsDeliveryAndPaidReport; reproduced unchanged on previous develop. These remain unverified/failing, not reported as complete.

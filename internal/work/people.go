@@ -4,6 +4,8 @@ import (
 	"chrisfoong/chaum-work-management-backend/internal/auth"
 	"context"
 	"encoding/json"
+	"errors"
+	"github.com/jackc/pgx/v5"
 
 	"log/slog"
 	"regexp"
@@ -377,7 +379,10 @@ func (s *Service) schedule(ctx context.Context, q Query, in ScheduleInput) ([]st
 			return nil, conflict("cannot change staffing in a calculated payroll period")
 		}
 		var newID string
-		if e = s.Repo.Row(ctx, q, query52, in.AssignmentID, worker, in.WorkDate, in.Start).Scan(&newID); e != nil {
+		if e = s.Repo.Row(ctx, q, query52, in.AssignmentID, worker, in.WorkDate, in.Start, s.Now().In(Bangkok).Format("2006-01-02")).Scan(&newID); e != nil {
+			if errors.Is(e, pgx.ErrNoRows) {
+				return nil, conflict("worker already assigned or previous shift has recorded history")
+			}
 			return nil, e
 		}
 		out = append(out, newID)

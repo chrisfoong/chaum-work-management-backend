@@ -91,7 +91,7 @@ func (s *Service) AvailableWorkers(ctx context.Context, date, excludeUser string
 }
 func (s *Service) availableWorkers(ctx context.Context, q Query, date, excludeUser string, limit, offset int) (json.RawMessage, error) {
 	// Validate every eligible mapping before paging so duplicates cannot be hidden.
-	rows, e := q.Query(ctx, frontendCandidateUsers, date, nullableID(excludeUser))
+	rows, e := q.Query(ctx, frontendCandidateUsers, date, nullableID(excludeUser), s.Now().In(Bangkok).Format("2006-01-02"))
 	if e != nil {
 		return nil, e
 	}
@@ -114,7 +114,7 @@ func (s *Service) availableWorkers(ctx context.Context, q Query, date, excludeUs
 			return nil, e
 		}
 	}
-	return s.Repo.List(ctx, q, frontendCandidates, date, nullableID(excludeUser), limit, offset)
+	return s.Repo.List(ctx, q, frontendCandidates, date, nullableID(excludeUser), s.Now().In(Bangkok).Format("2006-01-02"), limit, offset)
 }
 func (s *Service) LeaveCandidates(ctx context.Context, id string, limit, offset int) (json.RawMessage, error) {
 	if e := validID(id, "request_id"); e != nil {
