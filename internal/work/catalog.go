@@ -70,6 +70,20 @@ func (s *Service) Location(ctx context.Context, id string, in LocationInput) (st
 		if id == "" {
 			return s.Repo.Row(ctx, q, query15, in.Name, in.Address, in.Latitude, in.Longitude).Scan(&id)
 		}
+		var previousLat, previousLon *float64
+		if e := q.QueryRow(ctx, `SELECT latitude::float8,longitude::float8 FROM location WHERE location_id=$1 FOR UPDATE`, id).Scan(&previousLat, &previousLon); e != nil {
+			return e
+		}
+		changed := !sameCoordinate(previousLat, in.Latitude) || !sameCoordinate(previousLon, in.Longitude)
+		if changed {
+			var scheduled bool
+			if e := q.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM tor_location_assignment a JOIN work_schedule s USING(assignment_id) WHERE a.location_id=$1)`, id).Scan(&scheduled); e != nil {
+				return e
+			}
+			if scheduled {
+				return conflict("พื้นที่มีกะงานแล้ว ไม่สามารถเปลี่ยนพิกัดย้อนหลัง")
+			}
+		}
 		tag, e := s.Repo.Exec(ctx, q, query16, id, in.Name, in.Address, in.Latitude, in.Longitude)
 		if e == nil && tag.RowsAffected() != 1 {
 			return conflict("location not found")
@@ -123,4 +137,11 @@ func (s *Service) Equipment(ctx context.Context, id string, in EquipmentInput) (
 }
 func (s *Service) Equipments(ctx context.Context, limit, offset int) (json.RawMessage, error) {
 	return s.Repo.List(ctx, s.Repo.Pool, query20, limit, offset)
+}
+
+func sameCoordinate(a, b *float64) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+	return *a == *b
 }

@@ -36,7 +36,10 @@ func registerReportingRoutes(worker, sup, asst *gin.RouterGroup, s *Service) {
 	}))
 	sup.GET("/payroll", payrollList(s))
 	worker.GET("/payroll", payrollList(s))
-	sup.POST("/payroll/:id/mark-paid", func(c *gin.Context) { respond(c, nil, s.Pay(c.Request.Context(), c.Param("id"))) })
+	sup.POST("/payroll/:id/mark-paid", func(c *gin.Context) { respond(c, nil, s.Pay(c.Request.Context(), actor(c), c.Param("id"))) })
+	sup.PATCH("/invoices/:id", input(func(c *gin.Context, _ auth.Principal, in InvoiceEditInput) (any, error) {
+		return nil, s.UpdateInvoice(c.Request.Context(), c.Param("id"), in)
+	}))
 	sup.POST("/invoices", input(func(c *gin.Context, _ auth.Principal, in InvoiceInput) (any, error) {
 		id, e := s.Invoice(c.Request.Context(), in)
 		return gin.H{"invoice_id": id}, e

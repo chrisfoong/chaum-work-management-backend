@@ -4,6 +4,7 @@ import (
 	"chrisfoong/chaum-work-management-backend/internal/auth"
 	"context"
 	"encoding/json"
+	"github.com/google/uuid"
 	"strings"
 	"time"
 )
@@ -143,13 +144,16 @@ func (s *Service) Payrolls(ctx context.Context, p auth.Principal, limit, offset 
 	}
 	return s.Repo.List(ctx, s.Repo.Pool, query35, owner, limit, offset)
 }
-func (s *Service) Pay(ctx context.Context, id string) error {
+func (s *Service) Pay(ctx context.Context, p auth.Principal, id string) error {
+	if p.Role != auth.RoleSupervisor || p.UserID == uuid.Nil {
+		return invalid("role", "Supervisor เท่านั้นที่ยืนยันจ่ายได้")
+	}
 	if e := validID(id, "payroll_id"); e != nil {
 		return e
 	}
-	tag, e := s.Repo.Exec(ctx, s.Repo.Pool, query36, id)
+	tag, e := s.Repo.Exec(ctx, s.Repo.Pool, query36, id, p.UserID)
 	if e == nil && tag.RowsAffected() != 1 {
-		return conflict("payroll not found")
+		return conflict("สลิปจ่ายแล้วหรือไม่พบรายการ กรุณารีเฟรชก่อนทำต่อ")
 	}
 	return e
 }

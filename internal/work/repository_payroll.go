@@ -11,7 +11,7 @@ const (
 	query33 = `SELECT count(*) FROM deduction_transaction WHERE attendance_id=$1`
 	query34 = `INSERT INTO deduction_transaction(worker_id,attendance_id,payroll_id,penalty_amount,reason) VALUES($1,$2,$3,$4::numeric,$5)`
 	query35 = `SELECT p.payroll_id,p.payroll_slip_no,p.user_id,p.managed_by_id,p.period_start,p.period_end,p.base_wage::text,p.total_deduction::text,p.net_wage::text,p.is_paid,COALESCE((SELECT jsonb_agg(jsonb_build_object('work_date',a.work_date,'penalty_amount',d.penalty_amount::text,'reason',d.reason)) FROM deduction_transaction d LEFT JOIN attendance a ON a.attendance_id=d.attendance_id WHERE d.payroll_id=p.payroll_id),'[]'::jsonb) AS calculated_penalties FROM payroll p WHERE ($1::uuid IS NULL OR (p.user_id=$1 AND p.is_paid)) ORDER BY p.period_start DESC,p.payroll_id LIMIT $2 OFFSET $3`
-	query36 = `UPDATE payroll SET is_paid=true WHERE payroll_id=$1`
+	query36 = `UPDATE payroll SET is_paid=true,managed_by_id=$2 WHERE payroll_id=$1 AND NOT is_paid`
 	query37 = `SELECT EXISTS(SELECT 1 FROM company_invoice WHERE tor_id=$1 AND billing_month=$2)`
 	query38 = `INSERT INTO company_invoice(invoice_no,tor_id,billing_month,expected_amount,exat_deduction_amount,deduction_reason) VALUES($1,$2,$3,$4::numeric,$5::numeric,$6) RETURNING invoice_id::text`
 	query39 = `SELECT status::text,net_received::text FROM company_invoice WHERE invoice_id=$1 FOR UPDATE`

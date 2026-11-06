@@ -12,8 +12,8 @@ func registerCatalogRoutes(web, sup *gin.RouterGroup, s *Service) {
 		return s.Contracts(ctx, l, o)
 	}))
 	web.GET("/contracts/:id", func(c *gin.Context) { out, e := s.Contract(c.Request.Context(), c.Param("id")); respond(c, out, e) })
-	web.GET("/users", list(func(ctx context.Context, _ auth.Principal, l, o int) (json.RawMessage, error) {
-		return s.Users(ctx, l, o)
+	web.GET("/users", list(func(ctx context.Context, p auth.Principal, l, o int) (json.RawMessage, error) {
+		return s.Users(ctx, p, l, o)
 	}))
 	sup.POST("/invitations", input(func(c *gin.Context, p auth.Principal, in InvitationUserInput) (any, error) {
 		return s.CreateInvitation(c.Request.Context(), p, in)
@@ -29,6 +29,29 @@ func registerCatalogRoutes(web, sup *gin.RouterGroup, s *Service) {
 	}))
 	sup.PATCH("/users/:id", input(func(c *gin.Context, _ auth.Principal, in UserUpdate) (any, error) {
 		return nil, s.UpdateUser(c.Request.Context(), c.Param("id"), in)
+	}))
+
+	sup.PATCH("/contracts/:id/details", input(func(c *gin.Context, p auth.Principal, in ContractDetailsInput) (any, error) {
+		return nil, s.UpdateContractDetails(c.Request.Context(), p, c.Param("id"), in)
+	}))
+	sup.POST("/contracts/:id/assignments", input(func(c *gin.Context, p auth.Principal, in AssignmentEditInput) (any, error) {
+		id, e := s.SaveAssignment(c.Request.Context(), p, c.Param("id"), "", in)
+		return map[string]any{"assignment_id": id}, e
+	}))
+	sup.GET("/assignments/:id/scope", func(c *gin.Context) {
+		out, e := s.AssignmentScope(c.Request.Context(), c.Param("id"))
+		respond(c, out, e)
+	})
+	sup.PATCH("/assignments/:id/scope", input(func(c *gin.Context, p auth.Principal, in AssignmentEditInput) (any, error) {
+		if e := validID(c.Param("id"), "assignment_id"); e != nil {
+			return nil, e
+		}
+		var tor string
+		if e := s.Repo.Pool.QueryRow(c.Request.Context(), `SELECT tor_id::text FROM tor_location_assignment WHERE assignment_id=$1`, c.Param("id")).Scan(&tor); e != nil {
+			return nil, e
+		}
+		id, e := s.SaveAssignment(c.Request.Context(), p, tor, c.Param("id"), in)
+		return map[string]any{"assignment_id": id}, e
 	}))
 	sup.PATCH("/contracts/:id", input(func(c *gin.Context, _ auth.Principal, in stateInput) (any, error) {
 		return nil, s.ContractState(c.Request.Context(), c.Param("id"), in.Status)

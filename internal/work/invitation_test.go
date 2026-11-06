@@ -194,7 +194,7 @@ func TestIntegrationInvitationUsesExistingSchema(t *testing.T) {
 			t.Fatal("server role not retained")
 		}
 	}
-	data, err := s.Users(ctx, 100, 0)
+	data, err := s.Users(ctx, f.supervisor, 100, 0)
 	if err != nil {
 		t.Fatal(err)
 	}

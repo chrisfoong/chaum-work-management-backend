@@ -62,20 +62,28 @@ func TestGPSAndQRBoth(t *testing.T) {
 	now := time.Date(2026, 10, 8, 8, 0, 0, 0, Bangkok)
 	s := &Service{QRSecret: []byte(strings.Repeat("s", 32)), Now: func() time.Time { return now }}
 	id := uuid.NewString()
-	token, e := s.signQR(QRClaims{id, now.Unix(), now.Add(5 * time.Minute).Unix()})
+	token, e := s.signQR(QRClaims{Assignment: id, Version: permanentQRVersion})
 	if e != nil || s.checkQR(token, id) != nil {
 		t.Fatal("valid QR failed")
 	}
 	if s.checkQR(token, uuid.NewString()) == nil || s.checkQR(token+"x", id) == nil {
 		t.Fatal("QR tamper/area accepted")
 	}
-	now = now.Add(5*time.Minute - time.Second)
+	now = now.AddDate(10, 0, 0)
 	if s.checkQR(token, id) != nil {
-		t.Fatal("QR expired before five minutes")
+		t.Fatal("printed QR must not expire with time")
 	}
-	now = now.Add(time.Second)
-	if s.checkQR(token, id) == nil {
-		t.Fatal("expired QR accepted")
+	again, err := s.signQR(QRClaims{Assignment: id, Version: permanentQRVersion})
+	if err != nil || token != again {
+		t.Fatal("reopening an assignment must reproduce the same printed code")
+	}
+	legacy, err := s.signQR(QRClaims{Assignment: id, Version: 0})
+	if err != nil || s.checkQR(legacy, id) == nil {
+		t.Fatal("legacy or unsupported QR version accepted")
+	}
+	rotated := &Service{QRSecret: []byte(strings.Repeat("r", 32))}
+	if rotated.checkQR(token, id) == nil {
+		t.Fatal("signing-key rotation did not invalidate printed code")
 	}
 	lat, lon, accuracy := 13.75, 100.5, 50.0
 	in := CheckIn{Latitude: &lat, Longitude: &lon, Accuracy: &accuracy}

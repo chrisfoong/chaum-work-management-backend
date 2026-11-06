@@ -3,7 +3,7 @@ package work
 // Exported-schema SQL for attendance.
 const (
 	query1  = `SELECT EXISTS(SELECT 1 FROM tor_location_assignment a JOIN contract_tor c ON c.tor_id=a.tor_id WHERE a.assignment_id=$1 AND c.status NOT IN ('cancelled','complete'))`
-	query2  = `SELECT s.assignment_id::text,s.work_date::text,s.shift_start_time::text,s.shift_status::text,l.latitude::float8,l.longitude::float8 FROM work_schedule s JOIN tor_location_assignment a ON a.assignment_id=s.assignment_id JOIN location l ON l.location_id=a.location_id WHERE s.schedule_id=$1 AND s.worker_id=$2 FOR UPDATE OF s`
+	query2  = `SELECT s.assignment_id::text,s.work_date::text,s.shift_start_time::text,s.shift_status::text,l.latitude::float8,l.longitude::float8 FROM work_schedule s JOIN tor_location_assignment a ON a.assignment_id=s.assignment_id JOIN location l ON l.location_id=a.location_id JOIN contract_tor c ON c.tor_id=a.tor_id WHERE s.schedule_id=$1 AND s.worker_id=$2 AND c.status='active' AND s.work_date BETWEEN c.start_date AND c.end_date FOR UPDATE OF s,c`
 	query3  = `SELECT EXISTS(SELECT 1 FROM leave_request WHERE user_id=$1 AND leave_date=$2::date AND status='approved')`
 	query4  = `INSERT INTO attendance(schedule_id,worker_id,work_date,check_in,status) VALUES($1,$2,$3::date,$4,$5) ON CONFLICT(schedule_id) DO UPDATE SET check_in=EXCLUDED.check_in,status=EXCLUDED.status WHERE attendance.check_in IS NULL AND attendance.check_out IS NULL AND attendance.worker_id=EXCLUDED.worker_id AND attendance.work_date=EXCLUDED.work_date AND attendance.status IS DISTINCT FROM 'leave'`
 	query5  = `SELECT shift_status::text,((work_date+shift_start_time) AT TIME ZONE 'Asia/Bangkok')+interval '8 hours' FROM work_schedule WHERE schedule_id=$1 AND worker_id=$2 FOR UPDATE`

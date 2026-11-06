@@ -5,10 +5,10 @@ const (
 	query41 = `INSERT INTO public."USER"(first_name,last_name,role,phone_number,line_id,bank_name,bank_account_no,daily_wage) VALUES($1,$2,$3,$4,$5,$6,$7,$8::numeric) RETURNING user_id::text`
 	query42 = `INSERT INTO worker(user_id) VALUES($1)`
 	query43 = `SELECT user_id,first_name,last_name,role,is_active FROM public."USER" WHERE user_id=$1`
-	query44 = `UPDATE public."USER" SET first_name=$2,last_name=$3,daily_wage=$4::numeric,is_active=COALESCE($5,is_active),updated_at=now() WHERE user_id=$1`
+	query44 = `UPDATE public."USER" SET first_name=$2,last_name=$3,daily_wage=$4::numeric,is_active=COALESCE($5,is_active),phone_number=COALESCE($6,phone_number),bank_name=COALESCE($7,bank_name),bank_account_no=COALESCE($8,bank_account_no),updated_at=now() WHERE user_id=$1`
 	query45 = `UPDATE worker SET is_available=$2 WHERE worker_id=$1`
 	query46 = `SELECT user_id,first_name,last_name,role,phone_number,bank_name,bank_account_no,daily_wage::text,is_active FROM public."USER" WHERE user_id=$1`
-	query47 = `SELECT u.user_id,u.first_name,u.last_name,u.role,u.is_active,(u.line_id LIKE 'INV:%') AS invitation_pending,(u.line_id LIKE 'CNL:%') AS invitation_cancelled,u.daily_wage::text,w.worker_id,w.is_available FROM public."USER" u LEFT JOIN worker w ON w.user_id=u.user_id ORDER BY u.user_id,w.worker_id LIMIT $1 OFFSET $2`
+	query47 = `SELECT u.user_id,u.first_name,u.last_name,u.role,u.is_active,(u.line_id LIKE 'INV:%') AS invitation_pending,(u.line_id LIKE 'CNL:%') AS invitation_cancelled,u.daily_wage::text,u.phone_number,CASE WHEN $3='supervisor' THEN u.bank_name END AS bank_name,CASE WHEN $3='supervisor' THEN u.bank_account_no END AS bank_account_no,w.worker_id,w.is_available FROM public."USER" u LEFT JOIN worker w ON w.user_id=u.user_id ORDER BY u.user_id,w.worker_id LIMIT $1 OFFSET $2`
 	query48 = `SELECT a.required_workers,c.start_date::text,c.end_date::text,c.status::text FROM tor_location_assignment a JOIN contract_tor c ON c.tor_id=a.tor_id WHERE a.assignment_id=$1 FOR UPDATE OF a`
 	query49 = `SELECT count(*) FROM work_schedule s JOIN worker w ON w.worker_id=s.worker_id WHERE s.assignment_id=$1 AND s.work_date=$2::date AND s.shift_status<>'cancelled' AND NOT EXISTS(SELECT 1 FROM leave_request l WHERE l.user_id=w.user_id AND l.leave_date=s.work_date AND l.status='approved')`
 	query50 = `SELECT w.user_id::text,w.is_available,u.is_active FROM worker w JOIN public."USER" u ON u.user_id=w.user_id WHERE w.worker_id=$1 AND u.role='worker' FOR UPDATE OF w`

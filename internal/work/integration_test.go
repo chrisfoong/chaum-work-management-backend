@@ -177,7 +177,7 @@ func TestIntegrationMVP(t *testing.T) {
 	if success != 1 {
 		t.Fatalf("concurrent payroll successes %d: %v", success, outcomes)
 	}
-	if e = s.Pay(ctx, slip); e != nil {
+	if e = s.Pay(ctx, sup, slip); e != nil {
 		t.Fatal(e)
 	}
 	if e = s.ReviewLeave(ctx, leave, "rejected"); e == nil {

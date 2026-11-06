@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 
+	"log/slog"
 	"regexp"
 )
 
@@ -64,11 +65,14 @@ func (s *Service) CreateUser(ctx context.Context, p auth.Principal, in UserInput
 }
 
 type UserUpdate struct {
-	FirstName string `json:"first_name"`
-	LastName  string `json:"last_name"`
-	DailyWage string `json:"daily_wage"`
-	Active    *bool  `json:"is_active"`
-	Available *bool  `json:"is_available"`
+	FirstName   string  `json:"first_name"`
+	LastName    string  `json:"last_name"`
+	DailyWage   string  `json:"daily_wage"`
+	Active      *bool   `json:"is_active"`
+	Available   *bool   `json:"is_available"`
+	Phone       *string `json:"phone_number"`
+	BankName    *string `json:"bank_name"`
+	BankAccount *string `json:"bank_account_no"`
 }
 
 func (s *Service) UpdateUser(ctx context.Context, id string, in UserUpdate) error {
@@ -85,11 +89,42 @@ func (s *Service) UpdateUser(ctx context.Context, id string, in UserUpdate) erro
 	if e != nil || w > 9999999999 {
 		return invalid("daily_wage", "invalid wage")
 	}
+	if in.Phone != nil && !regexp.MustCompile(`^[0-9]{10}$`).MatchString(*in.Phone) {
+		return invalid("phone_number", "ต้องเป็นตัวเลข 10 หลัก")
+	}
+	if in.BankName != nil {
+		if e := text(*in.BankName, "bank_name", 100); e != nil {
+			return e
+		}
+	}
+	if in.BankAccount != nil {
+		if e := text(*in.BankAccount, "bank_account_no", 50); e != nil {
+			return e
+		}
+	}
 	return s.Repo.Transaction(ctx, func(q Query) error {
 		if e := lock(ctx, q, "worker:"+id); e != nil {
 			return e
 		}
 
+		if err := lock(ctx, q, "people:active-supervisors"); err != nil {
+			return err
+		}
+		var role string
+		var active bool
+		if err := q.QueryRow(ctx, `SELECT role::text,is_active FROM public."USER" WHERE user_id=$1 FOR UPDATE`, id).Scan(&role, &active); err != nil {
+			return err
+		}
+		if err := protectLastSupervisor(ctx, q, role, active, in.Active); err != nil {
+			return err
+		}
+		if in.Active != nil {
+			active = *in.Active
+		}
+		if !active && role == "worker" {
+			available := false
+			in.Available = &available
+		}
 		if in.Active != nil && *in.Active {
 			var pending bool
 			if err := q.QueryRow(ctx, `SELECT (line_id LIKE 'INV:%' OR line_id LIKE 'CNL:%') FROM public."USER" WHERE user_id=$1`, id).Scan(&pending); err != nil {
@@ -99,12 +134,22 @@ func (s *Service) UpdateUser(ctx context.Context, id string, in UserUpdate) erro
 				return conflict("ต้องผูกบัญชี LINE ผ่านลิงก์เชิญก่อนเปิดใช้งาน")
 			}
 		}
-		tag, e := s.Repo.Exec(ctx, q, query44, id, in.FirstName, in.LastName, Decimal(w), in.Active)
+		tag, e := s.Repo.Exec(ctx, q, query44, id, in.FirstName, in.LastName, Decimal(w), in.Active, in.Phone, in.BankName, in.BankAccount)
 		if e != nil {
 			return e
 		}
 		if tag.RowsAffected() == 0 {
 			return conflict("user missing")
+		}
+		if !active && role == "worker" {
+			disabled, e := q.Exec(ctx, `UPDATE worker SET is_available=false WHERE user_id=$1`, id)
+			if e != nil {
+				return e
+			}
+			if disabled.RowsAffected() > 1 {
+				slog.Warn("duplicate Worker mappings disabled while suspending an account")
+			}
+			return nil
 		}
 		if in.Available != nil {
 			worker, e := s.Worker(ctx, q, id)
@@ -120,8 +165,8 @@ func (s *Service) UpdateUser(ctx context.Context, id string, in UserUpdate) erro
 func (s *Service) Me(ctx context.Context, p auth.Principal) (json.RawMessage, error) {
 	return one(ctx, s.Repo.Pool, query46, p.UserID)
 }
-func (s *Service) Users(ctx context.Context, limit, offset int) (json.RawMessage, error) {
-	return s.Repo.List(ctx, s.Repo.Pool, query47, limit, offset)
+func (s *Service) Users(ctx context.Context, p auth.Principal, limit, offset int) (json.RawMessage, error) {
+	return s.Repo.List(ctx, s.Repo.Pool, query47, limit, offset, string(p.Role))
 }
 
 type ScheduleInput struct {
@@ -270,6 +315,14 @@ func (s *Service) scheduleTransaction(ctx context.Context, in ScheduleInput) (ou
 func (s *Service) schedule(ctx context.Context, q Query, in ScheduleInput) ([]string, error) {
 	var out []string
 
+	var lockedContract string
+	if e := q.QueryRow(ctx, `SELECT c.tor_id::text FROM contract_tor c JOIN tor_location_assignment a ON a.tor_id=c.tor_id WHERE a.assignment_id=$1 FOR UPDATE OF c`, in.AssignmentID).Scan(&lockedContract); e != nil {
+		return nil, e
+	}
+	var lockedLocation string
+	if e := q.QueryRow(ctx, `SELECT l.location_id::text FROM location l JOIN tor_location_assignment a ON a.location_id=l.location_id WHERE a.assignment_id=$1 FOR SHARE OF l`, in.AssignmentID).Scan(&lockedLocation); e != nil {
+		return nil, e
+	}
 	if e := lock(ctx, q, "staffing:"+in.AssignmentID+":"+in.WorkDate); e != nil {
 		return nil, e
 	}
@@ -432,4 +485,19 @@ func (s *Service) ReviewLeaveAndReplace(ctx context.Context, id string, in Leave
 		}
 	}
 	return ids, err
+}
+
+// Caller holds the global Supervisor-count lock and the target user row lock.
+func protectLastSupervisor(ctx context.Context, q Query, role string, active bool, next *bool) error {
+	if next == nil || *next || !active || role != "supervisor" {
+		return nil
+	}
+	var count int
+	if err := q.QueryRow(ctx, `SELECT count(*) FROM public."USER" WHERE role='supervisor' AND is_active`).Scan(&count); err != nil {
+		return err
+	}
+	if count <= 1 {
+		return conflict("ไม่สามารถระงับ Supervisor คนสุดท้ายได้")
+	}
+	return nil
 }

@@ -277,3 +277,22 @@ User requested a summary sent to the same Worker. Added ownership-scoped WorkerP
 
 ## Complete Worker Flex presentation test — 2026-10-30
 Enriched existing schedule, equipment-review and payroll event cards with committed details (project/area/date/overnight time, explicit purchase approval/rejection, calculated vs paid wage status). Full isolated business workflow generated 13 cards, all validated and accepted by real LINE in four pushes to the existing Worker. User confirmed receipt of all 13. No shared Supabase writes or role changes in this suite. Paid-state card was manually triggered after Pay in the isolated test; existing Pay has no auto-notification hook. Personal summary remains a manual extension. OAuth/GPS device/Storage transport remain mocked. Full tests, vet and build passed. Native batch screenshots and Docker rollout remain pending.
+
+## Permanent printed area QR — 2026-11-05
+
+User chose Supervisor-generated permanent signs to minimize changes to document images. QR v2 binds the assignment with HMAC-SHA256, has no expiry, and is stable while the assignment/signing key is unchanged. Supervisor-only issuance; Worker check-in still checks identity, owned shift, approved leave, active/in-date contract and GPS. Frontend removes staff countdown and Assistant issuance entry, offers SVG download for printing, and directs Worker to the area sign. No schema/env/shared database changes. Legacy five-minute codes must be replaced; signing-key rotation invalidates all signs. Verification: Backend 217 test/subtest pass events, zero failures and 35 skipped integration events (no isolated loopback PostgreSQL available); gofmt, vet and build passed. Focused signature/version/assignment/key-rotation and Assistant HTTP denial tests passed. Frontend 47 tests, typecheck, lint, formatting and production build passed. Docker startup was requested but its engine did not become responsive; no Supabase writes. New contract recheck integration test remains skipped. No commit/push/deployment or real-device scan claimed.
+
+
+## Supervisor correction workflows - 2026-11-06
+
+User approved contract detail/scope correction, staff contact/bank correction, last-active-Supervisor protection, pending invoice editing and payment confirmer/replay protection. Added Supervisor-only endpoints, existing-style frontend forms, stale-form checks, exact money validation and read models that expose staff bank details only to Supervisor. Scope edits stop before schedules/survey/purchases; original items cannot be deleted. Location coordinates cannot change once scheduled. Payment records confirmer in existing NOT NULL managed_by_id; no separate processor history or paid_at is invented. No schema/env/shared Supabase mutations.
+
+Verification: Frontend 48 tests, typecheck, lint, formatting and production build passed. Backend latest recorded 221 test/subtest events passed, zero failures; 38 integration events skipped without isolated PostgreSQL. Added validation, Assistant endpoint-denial, last-Supervisor and proxy route tests. New database edit/payment/contract tests remain unverified. Subsequent SQL-cast/location-lock changes require the final recorded rerun. Docker CLI works but Engine API requests hang despite user-reported running status; no existing containers restarted. No commit/push/deployment or real-device proof.
+
+
+## Develop push verification - 2026-11-06
+
+- Permanent Supervisor area QR and guarded administrative edits included.
+- gofmt, go test -count=1 ./..., go vet ./... and go build ./... passed.
+- Test events: 221 passed, 38 skipped integration tests; skipped tests remain unverified.
+- No shared database test writes, schema changes or secret-file inspection in this verification.

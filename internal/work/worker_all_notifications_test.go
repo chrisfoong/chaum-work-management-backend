@@ -164,7 +164,7 @@ func TestIntegrationAllWorkerFlexFlows(t *testing.T) {
 		t.Fatal(err)
 	}
 	receive("7W ประมวลผลค่าจ้าง ยังไม่ยืนยันการจ่าย")
-	if err = s.Pay(ctx, payroll); err != nil {
+	if err = s.Pay(ctx, f.supervisor, payroll); err != nil {
 		t.Fatal(err)
 	}
 	// Explicit notification presentation test for committed paid state. Pay has

@@ -8,12 +8,13 @@ Web /api/web uses verified LINE Web tokens and Supervisor/Assistant; Mini App /a
 | --- | --- |
 | TOR preview/confirm, user/catalog writes, procurement review, funding, payroll, invoices, profit | Supervisor |
 | Schedules, leave review/replacement, survey, inspection/decision, purchase/delivery | Assistant |
-| Staff lists/dashboard, assignment QR, evidence | Supervisor/Assistant |
+| Staff lists/dashboard, evidence | Supervisor/Assistant |
+| Assignment QR creation/download for printed area signs | Supervisor |
 | Own schedules, leave, attendance, requisitions, payslips | Worker |
 
 Lists: limit1-100(default50), offset0-100000(default0); response data/limit/offset. Dates YYYY-MM-DD; months YYYY-MM; money decimal strings; IDs UUID. Payroll periods must match1-15 or16-month end.
 
-Check-in requires schedule_id, qr_token, latitude, longitude and accuracy. Staff assignment QR expires after 5 minutes (300 seconds) and is reusable across workers; one check-in/schedule prevents repeat check-in. All GPS fields required. Check-in is allowed on the scheduled Bangkok calendar day (including before planned start) until the end of the eight-hour shift; overnight continuation remains supported. Early check-in is on_time. Checkout needs owned evidence and description.
+Check-in requires schedule_id, qr_token, latitude, longitude and accuracy. Supervisor-issued assignment QR v2 is permanent and reusable across workers. Response: qr_token, assignment_id, permanent=true (no expires_at). Reopening produces the same code for the assignment/signing key; rotating the signing key invalidates all printed codes. Old time-limited codes must be replaced; one check-in/schedule prevents repeat check-in. All GPS fields required. Check-in is allowed on the scheduled Bangkok calendar day (including before planned start) until the end of the eight-hour shift; overnight continuation remains supported. Early check-in is on_time. Checkout needs owned evidence and description.
 
 POST /files accepts raw body with Content-Type, not multipart, max5MiB. Worker JPEG/PNG; staff also PDF. Use returned object path, not an external URL. GET /files?path=... enforces access and proxies private storage.
 
@@ -86,3 +87,14 @@ Push notifications use Flex Message bubbles with altText, Thai headings and HTTP
 Leave-review Flex cards include the committed leave_no, leave_date, original leave reason and explicit approval/rejection heading. Initial events and manual retries share the same persisted-state formatter. Pending requests cannot be announced as reviewed. No new rejection-comment field or schema column is invented.
 
 Worker personal summary is a separate service formatter requested on 2026-10-30; it requires a Worker principal and scopes SQL by that Worker mapping and TOR/date range. It has no public route or automatic notification trigger in this change. Staff 9A authorization is unchanged. Counts are a current personal view, not a project-closing report. Cards open the Worker Mini App entry, not a dedicated summary page.
+
+
+## Supervisor correction workflows - 2026-11-05
+
+- PATCH /contracts/:id/details: project_name, partner_agency, start_date, end_date, contract_value, optional contract_file_path, required expected_updated_at from GET contract. Contract number remains immutable. Closed/cancelled contracts and stale forms are rejected. Dates must cover existing schedules/invoice months. Value changes stop after financial records. Changed contract evidence requires owned verified PNG <=5MiB.
+- POST /contracts/:id/assignments and PATCH /assignments/:id/scope: location_id, required_workers, items [{equipment_id,required_qty}]. Updates require expected_required_workers and expected_items from GET /assignments/:id/scope. Existing items cannot be omitted. Existing scope is editable only before schedules, survey or purchases; additions create a separate pending_survey base request. Generated to_buy_qty is never written.
+- PATCH /users/:id additionally accepts optional phone_number, bank_name, bank_account_no. These bank fields in staff list are Supervisor-only. Suspending a Worker also disables availability; the last active Supervisor cannot be suspended through this API. This is not a role-change endpoint.
+- PATCH /invoices/:id: expected_amount, exat_deduction_amount, deduction_reason, previous_expected_amount. Pending only, exact decimal validation and row lock; stale/paid edits rejected. No bank transfer occurs.
+- POST /payroll/:id/mark-paid rejects repeats and records the verified Supervisor in managed_by_id. Schema requires that column from slip creation: before payment it contains the processor, after payment the confirmer. No separate durable processor/payment history or paid_at field exists.
+
+All correction mutations are Supervisor-only; Assistant operational permissions and Worker ownership remain unchanged. No new tables or schema migration.

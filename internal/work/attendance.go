@@ -13,12 +13,13 @@ import (
 	"time"
 )
 
-const qrLifetime = 5 * time.Minute
+// Printed area codes are stable for the assignment and signing key. Authorization,
+// contract validity, shift ownership and GPS are checked afresh at every check-in.
+const permanentQRVersion = 2
 
 type QRClaims struct {
 	Assignment string `json:"assignment_id"`
-	Issued     int64  `json:"iat"`
-	Expiry     int64  `json:"exp"`
+	Version    int    `json:"v"`
 }
 
 func (s *Service) signQR(c QRClaims) (string, error) {
@@ -56,9 +57,8 @@ func (s *Service) checkQR(token, assignment string) error {
 	if json.Unmarshal(body, &c) != nil {
 		return invalid("qr_token", "invalid QR")
 	}
-	now := s.Now().Unix()
-	if c.Assignment != assignment || c.Issued > now || c.Expiry <= now || c.Expiry-c.Issued != int64(qrLifetime/time.Second) {
-		return invalid("qr_token", "expired QR or wrong assignment")
+	if c.Version != permanentQRVersion || c.Assignment != assignment {
+		return invalid("qr_token", "unsupported QR or wrong assignment; scan the current area sign")
 	}
 	return nil
 }
@@ -73,9 +73,8 @@ func (s *Service) QR(ctx context.Context, id string) (map[string]any, error) {
 	if !exists {
 		return nil, conflict("assignment not available")
 	}
-	now := s.Now()
-	token, e := s.signQR(QRClaims{id, now.Unix(), now.Add(qrLifetime).Unix()})
-	return map[string]any{"qr_token": token, "expires_at": now.Add(qrLifetime)}, e
+	token, e := s.signQR(QRClaims{Assignment: id, Version: permanentQRVersion})
+	return map[string]any{"qr_token": token, "assignment_id": id, "permanent": true}, e
 }
 
 type CheckIn struct {

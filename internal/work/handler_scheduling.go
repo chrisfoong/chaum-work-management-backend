@@ -47,6 +47,6 @@ func registerSchedulingRoutes(web, worker, sup, asst *gin.RouterGroup, s *Servic
 	worker.POST("/attendance/check-out", input(func(c *gin.Context, p auth.Principal, in CheckOut) (any, error) {
 		return nil, s.CheckOut(c.Request.Context(), p, in)
 	}))
-	web.POST("/assignments/:id/qr", func(c *gin.Context) { out, e := s.QR(c.Request.Context(), c.Param("id")); respond(c, out, e) })
+	sup.POST("/assignments/:id/qr", func(c *gin.Context) { out, e := s.QR(c.Request.Context(), c.Param("id")); respond(c, out, e) })
 	sup.POST("/attendance/finalize", func(c *gin.Context) { n, e := s.Finalize(c.Request.Context()); respond(c, gin.H{"changed": n}, e) })
 }

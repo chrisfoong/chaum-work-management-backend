@@ -67,7 +67,11 @@ func requestModels() map[string]any {
 	}{}
 	return map[string]any{
 		"POST /api/web/contracts/info": contract.ContractInfo{}, "POST /api/web/contracts/scope": contract.Scope{}, "POST /api/web/contracts/confirm": contract.ConfirmRequest{},
-		"POST /api/web/users": work.UserInput{}, "PATCH /api/web/users/{id}": work.UserUpdate{}, "PATCH /api/web/contracts/{id}": state,
+		"PATCH /api/web/contracts/{id}/details":    work.ContractDetailsInput{},
+		"POST /api/web/contracts/{id}/assignments": work.AssignmentEditInput{},
+		"PATCH /api/web/assignments/{id}/scope":    work.AssignmentEditInput{},
+		"PATCH /api/web/invoices/{id}":             work.InvoiceEditInput{},
+		"POST /api/web/users":                      work.UserInput{}, "PATCH /api/web/users/{id}": work.UserUpdate{}, "PATCH /api/web/contracts/{id}": state,
 		"POST /api/web/locations": work.LocationInput{}, "PATCH /api/web/locations/{id}": work.LocationInput{}, "POST /api/web/equipment": work.EquipmentInput{}, "PATCH /api/web/equipment/{id}": work.EquipmentInput{},
 		"POST /api/web/schedules": work.ScheduleInput{}, "POST /api/liff/leave-requests": work.LeaveInput{}, "POST /api/web/leave-requests/{id}/review": work.LeaveReviewInput{}, "POST /api/web/leave-requests/{id}/replacement": replacement,
 		"POST /api/liff/attendance/check-in": work.CheckIn{}, "POST /api/liff/attendance/check-out": work.CheckOut{}, "POST /api/liff/requisitions": work.RequestInput{}, "POST /api/web/requisitions/{id}/survey": survey, "POST /api/web/requisitions/{id}/review": review, "POST /api/web/requisitions/{id}/fund-transfers": work.FundInput{}, "POST /api/web/requisitions/{id}/purchase": work.PurchaseInput{},
