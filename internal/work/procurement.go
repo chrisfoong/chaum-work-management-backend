@@ -386,7 +386,7 @@ func (s *Service) executePurchase(ctx context.Context, p auth.Principal, id stri
 				return conflict("receipt already used for a purchase")
 			}
 			if review == nil {
-				if e := s.Repo.Row(ctx, q, query84, document("EXP"), p.UserID, id, Decimal(total), in.Receipt).Scan(&expense); e != nil {
+				if e := s.Repo.Row(ctx, q, query84, document("EXP"), p.UserID, id, Decimal(total), in.Receipt, s.Now()).Scan(&expense); e != nil {
 					return e
 				}
 			}

@@ -39,7 +39,7 @@ func TestIntegrationAtomicAttendanceAndRollback(t *testing.T) {
 	for _, step := range []struct {
 		sql  string
 		args []any
-	}{{`INSERT INTO worker(worker_id,user_id) VALUES($1,$2)`, []any{worker, user}}, {`INSERT INTO location(location_id,location_name,latitude,longitude) VALUES($1,$2,13.75,100.5)`, []any{loc, loc.String()}}, {`INSERT INTO contract_tor(tor_id,contract_no,project_name,user_id,partner_agency,start_date,end_date,contract_value) VALUES($1,$2,'atomic',$3,'test','2026-10-01','2026-10-31',1)`, []any{tor, tor.String(), sup}}, {`INSERT INTO tor_location_assignment(assignment_id,tor_id,location_id,required_workers) VALUES($1,$2,$3,1)`, []any{assignment, tor, loc}}, {`INSERT INTO work_schedule(schedule_id,assignment_id,worker_id,work_date,shift_start_time) VALUES($1,$2,$3,'2026-10-08','08:00')`, []any{schedule, assignment, worker}}} {
+	}{{`INSERT INTO worker(worker_id,user_id) VALUES($1,$2)`, []any{worker, user}}, {`INSERT INTO location(location_id,location_name,latitude,longitude) VALUES($1,$2,13.75,100.5)`, []any{loc, loc.String()}}, {`INSERT INTO contract_tor(tor_id,contract_no,project_name,user_id,partner_agency,start_date,end_date,contract_value,status) VALUES($1,$2,'atomic',$3,'test','2026-10-01','2026-10-31',1,'active')`, []any{tor, tor.String(), sup}}, {`INSERT INTO tor_location_assignment(assignment_id,tor_id,location_id,required_workers) VALUES($1,$2,$3,1)`, []any{assignment, tor, loc}}, {`INSERT INTO work_schedule(schedule_id,assignment_id,worker_id,work_date,shift_start_time) VALUES($1,$2,$3,'2026-10-08','08:00')`, []any{schedule, assignment, worker}}} {
 		if _, e := pool.Exec(ctx, step.sql, step.args...); e != nil {
 			t.Fatal(e)
 		}
@@ -65,7 +65,7 @@ func TestIntegrationAtomicAttendanceAndRollback(t *testing.T) {
 		}
 	}
 	if success != 1 {
-		t.Fatalf("check-in successes %d", success)
+		t.Fatalf("check-in successes %d: %v", success, outcomes)
 	}
 	// An overlong DB-bound path fails the evidence insert after updating check_out.
 	// The whole transaction must roll back, leaving check_out unset.
