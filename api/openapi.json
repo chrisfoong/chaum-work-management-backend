@@ -2840,6 +2840,9 @@
               "schema": {
                 "additionalProperties": false,
                 "properties": {
+                  "reason": {
+                    "type": "string"
+                  },
                   "replacement_worker_id": {
                     "type": "string"
                   },

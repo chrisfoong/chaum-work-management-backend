@@ -103,7 +103,7 @@ func TestIntegrationMVP(t *testing.T) {
 	if _, e = s.Leave(ctx, worker, LeaveInput{"2026-10-04", "duplicate"}); e == nil {
 		t.Fatal("duplicate leave allowed")
 	}
-	if e = s.ReviewLeave(ctx, leave, "approved"); e != nil {
+	if e = s.ReviewLeave(ctx, leave, "approved", ""); e != nil {
 		t.Fatal(e)
 	}
 	sub, e := s.Replacement(ctx, leave, w2)
@@ -180,7 +180,7 @@ func TestIntegrationMVP(t *testing.T) {
 	if e = s.Pay(ctx, sup, slip); e != nil {
 		t.Fatal(e)
 	}
-	if e = s.ReviewLeave(ctx, leave, "rejected"); e == nil {
+	if e = s.ReviewLeave(ctx, leave, "rejected", "กำลังคนไม่พอ"); e == nil {
 		t.Fatal("reviewed leave changed")
 	}
 	unpaid, e := s.PreviewPayroll(ctx, PayrollInput{worker.UserID.String(), period.Start, period.End})

@@ -176,7 +176,17 @@ Services and handlers:
 | `internal/work/delivery.go` | 8A delivery recording and listing via the WORK_EVIDENCE description convention, plus evidence-photo checks. |
 | `internal/work/continuation.go` | Contract and 9A selected-area continuation read models (`can_continue`). |
 | `internal/work/tor_equipment.go` | Read of active initial TOR equipment for an assignment, filtered by owner. |
-| `internal/work/report_http.go` | HTTP report endpoints, including a dependency-free financial profit PDF generator. |
+| `internal/work/report_http.go` | HTTP report endpoints and CSV/PDF formatting helpers. |
+| `internal/work/profit_pdf.go` | Thai-capable financial profit PDF generator with embedded Sarabun font. |
+| `internal/work/assets/Sarabun-Regular.ttf` | Embedded Sarabun Regular font for Thai financial PDF reports. |
+| `internal/work/assets/Sarabun-OFL.txt` | Open Font License for the embedded Sarabun font. |
+| `internal/work/editing.go` | Guarded Supervisor administrative edits for contracts, assignments and invoices. |
+| `internal/work/invoice_budget.go` | Contract value budget guard when issuing company invoices. |
+| `internal/work/invoice_deductions.go` | Invoice deduction calculation, preview and PDF export. |
+| `internal/work/leave_notification.go` | Leave review message builder and rejection reason splitting. |
+| `internal/work/line_cards.go` | Branded LINE Flex Message cards for worker and dashboard notifications. |
+| `internal/work/worker_event_messages.go` | Detailed Thai notification messages for worker schedules, payroll and equipment review. |
+| `internal/work/worker_project_summary.go` | Worker project operations summary notification. |
 
 Repositories (SQL against the exported schema):
 | Path | Purpose |
@@ -214,6 +224,20 @@ Tests:
 | `internal/work/onboarding_platform_test.go` | Integration test confirming onboarding routes users by their verified database role. |
 | `internal/work/payroll_role_history_test.go` | Integration test confirming payroll keeps scheduled work after a user role change. |
 | `internal/work/tor_equipment_test.go` | Integration test for assignment equipment filtering by TOR and owner. |
+| `internal/work/cancelled_schedule_integration_test.go` | Integration test for reassigning unused shifts from cancelled or completed contracts. |
+| `internal/work/leave_rejection_paths_integration_test.go` | Integration tests for leave approval/rejection, no-purchase and Supervisor purchase rejection paths including LINE messages. |
+| `internal/work/editing_test.go` | Integration tests for guarded administrative edits on contracts, assignments and invoices. |
+| `internal/work/final_http_flow_test.go` | End-to-end HTTP flow test for attendance, invoices and reports. |
+| `internal/work/invoice_budget_test.go` | Integration tests for contract budget guards on company invoices. |
+| `internal/work/invoice_deductions_test.go` | Integration tests for invoice deduction calculation and PDF export. |
+| `internal/work/leave_notification_test.go` | Integration tests for leave review Flex notifications. |
+| `internal/work/line_cards_mock_test.go` | Mock tests for LINE Flex message card payloads. |
+| `internal/work/line_cards_test.go` | Unit tests for LINE Flex message card formatting. |
+| `internal/work/missing_checkout_test.go` | Integration tests for missing checkout detection and payroll guards. |
+| `internal/work/permanent_qr_test.go` | Tests for permanent area QR token signing and validation. |
+| `internal/work/ui_regressions_test.go` | Regression tests for UI workflows and read models. |
+| `internal/work/worker_all_notifications_test.go` | Integration tests verifying all worker LINE notification events. |
+| `internal/work/worker_project_summary_test.go` | Integration tests for worker project summary notifications. |
 
 ## `docs/`
 

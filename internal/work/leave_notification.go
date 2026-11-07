@@ -3,7 +3,20 @@ package work
 import (
 	"context"
 	"fmt"
+	"strings"
 )
+
+// leaveRejectionMarker separates the worker's leave reason from the Assistant's
+// rejection reason inside leave_request.reason (no extra column in the schema).
+const leaveRejectionMarker = "[Rejection] "
+
+// splitLeaveReason returns the worker's own reason and the rejection reason.
+func splitLeaveReason(value string) (string, string) {
+	if pos := strings.LastIndex(value, "\n"+leaveRejectionMarker); pos >= 0 {
+		return value[:pos], value[pos+1+len(leaveRejectionMarker):]
+	}
+	return value, ""
+}
 
 // Build the notification from committed leave state, shared by initial send
 // and guarded resend. Never infer the decision from a client-provided label.
@@ -19,5 +32,10 @@ func formatLeaveReviewMessage(number, date, reason, state string) (string, error
 	if state != "approved" && state != "rejected" {
 		return "", conflict("leave review is not committed")
 	}
-	return fmt.Sprintf("Chaum: leave %s.\nเลขใบลา: %s\nวันที่ลา: %s\nเหตุผลการลา: %s", state, number, date, reason), nil
+	own, rejection := splitLeaveReason(reason)
+	message := fmt.Sprintf("Chaum: leave %s.\nเลขใบลา: %s\nวันที่ลา: %s\nเหตุผลการลา: %s", state, number, date, own)
+	if state == "rejected" && rejection != "" {
+		message += "\nเหตุผลที่ไม่อนุมัติ: " + rejection + "\nกรุณาเข้างานตามกะเดิม"
+	}
+	return message, nil
 }

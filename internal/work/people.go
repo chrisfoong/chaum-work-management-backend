@@ -9,6 +9,7 @@ import (
 
 	"log/slog"
 	"regexp"
+	"strings"
 )
 
 type UserInput struct {
@@ -269,14 +270,17 @@ func (s *Service) Leaves(ctx context.Context, p auth.Principal, limit, offset in
 	}
 	return s.Repo.List(ctx, s.Repo.Pool, query57, owner, limit, offset)
 }
-func (s *Service) ReviewLeave(ctx context.Context, id, state string) error {
+func (s *Service) ReviewLeave(ctx context.Context, id, state, reason string) error {
 	if e := validID(id, "request_id"); e != nil {
 		return e
 	}
 	if state != "approved" && state != "rejected" {
 		return invalid("status", "approved or rejected required")
 	}
-	err := s.Repo.Transaction(ctx, func(q Query) error { return s.reviewLeave(ctx, q, id, state) })
+	if e := leaveRejectionReason(state, reason); e != nil {
+		return e
+	}
+	err := s.Repo.Transaction(ctx, func(q Query) error { return s.reviewLeave(ctx, q, id, state, reason) })
 	if err == nil {
 		s.Event("leave_review", id)
 	}
@@ -390,7 +394,18 @@ func (s *Service) schedule(ctx context.Context, q Query, in ScheduleInput) ([]st
 	return out, nil
 }
 
-func (s *Service) reviewLeave(ctx context.Context, q Query, id, state string) error {
+// leaveRejectionReason requires the Assistant's reason only for rejection.
+func leaveRejectionReason(state, reason string) error {
+	if state != "rejected" {
+		return nil
+	}
+	if strings.Contains(reason, leaveRejectionMarker) {
+		return invalid("reason", "reason contains a reserved marker")
+	}
+	return text(reason, "reason", 500)
+}
+
+func (s *Service) reviewLeave(ctx context.Context, q Query, id, state, reason string) error {
 
 	var user, date string
 	var advance bool
@@ -424,7 +439,7 @@ func (s *Service) reviewLeave(ctx context.Context, q Query, id, state string) er
 			return conflict("cannot approve leave after check-in")
 		}
 	}
-	tag, e := s.Repo.Exec(ctx, q, query62, id, state)
+	tag, e := s.Repo.Exec(ctx, q, query62, id, state, strings.TrimSpace(reason))
 	if e != nil {
 		return e
 	}
@@ -442,6 +457,8 @@ func (s *Service) reviewLeave(ctx context.Context, q Query, id, state string) er
 type LeaveReviewInput struct {
 	Status   string `json:"status"`
 	WorkerID string `json:"replacement_worker_id"`
+	// Reason is the Assistant's explanation, required when Status is rejected.
+	Reason string `json:"reason,omitempty"`
 }
 
 func (s *Service) ReviewLeaveAndReplace(ctx context.Context, id string, in LeaveReviewInput) ([]string, error) {
@@ -459,9 +476,12 @@ func (s *Service) ReviewLeaveAndReplace(ctx context.Context, id string, in Leave
 			return nil, invalid("replacement_worker_id", "only permitted with approval")
 		}
 	}
+	if e := leaveRejectionReason(in.Status, in.Reason); e != nil {
+		return nil, e
+	}
 	var ids []string
 	err := s.Repo.Transaction(ctx, func(q Query) error {
-		if e := s.reviewLeave(ctx, q, id, in.Status); e != nil {
+		if e := s.reviewLeave(ctx, q, id, in.Status, in.Reason); e != nil {
 			return e
 		}
 		if in.WorkerID == "" {

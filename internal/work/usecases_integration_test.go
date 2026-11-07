@@ -86,14 +86,14 @@ func TestIntegrationEmergencyLeaveAndAtomicReplacement(t *testing.T) {
 	if e = f.pool.QueryRow(ctx, `SELECT is_advance_notice FROM leave_request WHERE request_id=$1`, leave).Scan(&advance); e != nil || advance {
 		t.Fatal("same-day must be emergency", e)
 	}
-	if _, e = s.ReviewLeaveAndReplace(ctx, leave, LeaveReviewInput{"approved", uuid.NewString()}); e == nil {
+	if _, e = s.ReviewLeaveAndReplace(ctx, leave, LeaveReviewInput{Status: "approved", WorkerID: uuid.NewString()}); e == nil {
 		t.Fatal("invalid replacement accepted")
 	}
 	var state string
 	if e = f.pool.QueryRow(ctx, `SELECT status::text FROM leave_request WHERE request_id=$1`, leave).Scan(&state); e != nil || state != "pending" {
 		t.Fatal("failed replacement did not roll back approval", e)
 	}
-	ids, e := s.ReviewLeaveAndReplace(ctx, leave, LeaveReviewInput{"approved", f.otherID})
+	ids, e := s.ReviewLeaveAndReplace(ctx, leave, LeaveReviewInput{Status: "approved", WorkerID: f.otherID})
 	if e != nil || len(ids) != 1 {
 		t.Fatal(e)
 	}

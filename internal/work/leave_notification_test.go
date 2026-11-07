@@ -31,7 +31,11 @@ func TestIntegrationLeaveDecisionFlexNotification(t *testing.T) {
 			}
 			capture := &leaveNoticeCapture{messages: make(chan string, 10)}
 			s.Notify = capture
-			if err = s.ReviewLeave(ctx, id, decision); err != nil {
+			reason := ""
+			if decision == "rejected" {
+				reason = "ช่วงนี้คนไม่พอ"
+			}
+			if err = s.ReviewLeave(ctx, id, decision, reason); err != nil {
 				t.Fatal(err)
 			}
 			var message string
@@ -42,6 +46,9 @@ func TestIntegrationLeaveDecisionFlexNotification(t *testing.T) {
 			}
 			if !strings.HasPrefix(message, "Chaum: leave "+decision+".\n") || !strings.Contains(message, "2026-10-02") || !strings.Contains(message, "พักธุระส่วนตัว") {
 				t.Fatal("decision details missing")
+			}
+			if decision == "rejected" && !strings.Contains(message, "เหตุผลที่ไม่อนุมัติ: ช่วงนี้คนไม่พอ") {
+				t.Fatal("rejection reason missing", message)
 			}
 			sender := LinePush{WorkerURL: "https://miniapp.line.me/2011922658-kb0yFlBE"}
 			card := sender.messageCard(message)
@@ -58,7 +65,7 @@ func TestIntegrationLeaveDecisionFlexNotification(t *testing.T) {
 			if err != nil || retry != message {
 				t.Fatal("resend differs from committed state")
 			}
-			if err = s.ReviewLeave(ctx, id, decision); err == nil {
+			if err = s.ReviewLeave(ctx, id, decision, reason); err == nil {
 				t.Fatal("duplicate review accepted")
 			}
 			select {

@@ -72,7 +72,11 @@ func TestIntegrationAllWorkerFlexFlows(t *testing.T) {
 		if _, err = s.Leave(ctx, f.worker, LeaveInput{date, "TEST ซ้ำ"}); err == nil {
 			t.Fatal("duplicate leave accepted")
 		}
-		if _, err = s.ReviewLeaveAndReplace(ctx, leave, LeaveReviewInput{Status: state}); err != nil {
+		review := LeaveReviewInput{Status: state}
+		if state == "rejected" {
+			review.Reason = "คนในพื้นที่ไม่เพียงพอ"
+		}
+		if _, err = s.ReviewLeaveAndReplace(ctx, leave, review); err != nil {
 			t.Fatal(err)
 		}
 		receive("2W ผลใบลา " + state)

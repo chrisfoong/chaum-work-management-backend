@@ -23,7 +23,7 @@ const (
 	query59 = `SELECT EXISTS(SELECT 1 FROM payroll WHERE user_id=$1 AND $2::date BETWEEN period_start AND period_end)`
 	query60 = `SELECT schedule_id::text FROM work_schedule WHERE worker_id=$1 AND work_date=$2::date FOR UPDATE`
 	query61 = `SELECT EXISTS(SELECT 1 FROM attendance WHERE schedule_id=$1 AND check_in IS NOT NULL)`
-	query62 = `UPDATE leave_request SET status=$2 WHERE request_id=$1 AND status='pending'`
+	query62 = `UPDATE leave_request SET status=$2::text::leave_status_enum,reason=CASE WHEN $2::text='rejected' THEN reason || E'\n` + leaveRejectionMarker + `' || $3::text ELSE reason END WHERE request_id=$1 AND status='pending'`
 	query63 = `INSERT INTO attendance(schedule_id,worker_id,work_date,status) VALUES($1,$2,$3::date,'leave') ON CONFLICT(schedule_id) DO UPDATE SET status='leave' WHERE attendance.check_in IS NULL`
 	query64 = `SELECT l.status::text,s.assignment_id::text,s.work_date::text,s.shift_start_time::text,w.worker_id::text FROM leave_request l JOIN worker w ON w.user_id=l.user_id JOIN work_schedule s ON s.worker_id=w.worker_id AND s.work_date=l.leave_date WHERE l.request_id=$1`
 )
