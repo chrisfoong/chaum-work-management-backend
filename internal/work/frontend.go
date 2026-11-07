@@ -74,6 +74,7 @@ func (s *Service) FilteredList(ctx context.Context, p auth.Principal, kind strin
 		sql = frontendLeaves
 	case "attendance":
 		sql = frontendAttendance
+		args = append(args, s.Now())
 	case "requisitions":
 		sql = frontendRequisitions
 		args = append(args, f.Kind)

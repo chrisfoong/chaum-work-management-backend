@@ -907,6 +907,44 @@
         "summary": "GET /api/web/assignments"
       }
     },
+    "/api/web/assignments/{id}": {
+      "delete": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation; see docs/API.md for payloads"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Unverified, inactive or unknown LINE identity"
+          },
+          "403": {
+            "description": "Role or ownership denied"
+          },
+          "409": {
+            "description": "State conflict"
+          }
+        },
+        "security": [
+          {
+            "lineIDToken": []
+          }
+        ],
+        "summary": "DELETE /api/web/assignments/{id}"
+      }
+    },
     "/api/web/assignments/{id}/continuation": {
       "get": {
         "parameters": [
@@ -2398,6 +2436,33 @@
           }
         ],
         "summary": "POST /api/web/invoices"
+      }
+    },
+    "/api/web/invoices/deduction-preview": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Successful operation; see docs/API.md for payloads"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Unverified, inactive or unknown LINE identity"
+          },
+          "403": {
+            "description": "Role or ownership denied"
+          },
+          "409": {
+            "description": "State conflict"
+          }
+        },
+        "security": [
+          {
+            "lineIDToken": []
+          }
+        ],
+        "summary": "GET /api/web/invoices/deduction-preview"
       }
     },
     "/api/web/invoices/{id}": {

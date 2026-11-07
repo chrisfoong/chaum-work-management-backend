@@ -37,11 +37,27 @@ func registerReportingRoutes(worker, sup, asst *gin.RouterGroup, s *Service) {
 	sup.GET("/payroll", payrollList(s))
 	worker.GET("/payroll", payrollList(s))
 	sup.POST("/payroll/:id/mark-paid", func(c *gin.Context) { respond(c, nil, s.Pay(c.Request.Context(), actor(c), c.Param("id"))) })
-	sup.PATCH("/invoices/:id", input(func(c *gin.Context, _ auth.Principal, in InvoiceEditInput) (any, error) {
-		return nil, s.UpdateInvoice(c.Request.Context(), c.Param("id"), in)
+	sup.PATCH("/invoices/:id", input(func(c *gin.Context, _ auth.Principal, in struct {
+		InvoiceEditInput
+		Auto bool `json:"auto_deduction"`
+	}) (any, error) {
+		if in.Auto {
+			in.Deduction = "0.00"
+		}
+		return nil, s.updateInvoice(c.Request.Context(), c.Param("id"), in.InvoiceEditInput, in.Auto)
 	}))
-	sup.POST("/invoices", input(func(c *gin.Context, _ auth.Principal, in InvoiceInput) (any, error) {
-		id, e := s.Invoice(c.Request.Context(), in)
+	sup.GET("/invoices/deduction-preview", func(c *gin.Context) {
+		out, e := s.InvoiceDeductions(c.Request.Context(), c.Query("tor_id"), c.Query("billing_month"))
+		respond(c, out, e)
+	})
+	sup.POST("/invoices", input(func(c *gin.Context, _ auth.Principal, in struct {
+		InvoiceInput
+		Auto bool `json:"auto_deduction"`
+	}) (any, error) {
+		if in.Auto {
+			in.Deduction = "0.00"
+		}
+		id, e := s.invoice(c.Request.Context(), in.InvoiceInput, in.Auto)
 		return gin.H{"invoice_id": id}, e
 	}))
 	sup.GET("/invoices", list(func(ctx context.Context, _ auth.Principal, l, o int) (json.RawMessage, error) {

@@ -24,6 +24,10 @@ func TestIntegrationPayrollRetainsScheduledWorkAfterRoleChange(t *testing.T) {
 			if err = f.service.CheckIn(ctx, f.worker, CheckIn{ids[0], &lat, &lon, &accuracy, qr["qr_token"].(string)}); err != nil {
 				t.Fatal(err)
 			}
+			*f.now = time.Date(2026, 10, 4, 16, 0, 0, 0, Bangkok)
+			if err = f.service.CheckOut(ctx, f.worker, CheckOut{ids[0], "finished", f.worker.UserID.String() + "/" + f.worker.UserID.String()}); err != nil {
+				t.Fatal(err)
+			}
 			if _, err = f.pool.Exec(ctx, `UPDATE public."USER" SET role=$1 WHERE user_id=$2`, role, f.worker.UserID); err != nil {
 				t.Fatal(err)
 			}

@@ -91,7 +91,7 @@ func (l *LinePush) messageCard(message string) map[string]any {
 		alt = alt[:400]
 	}
 	bubble := map[string]any{"type": "bubble", "body": map[string]any{"type": "box", "layout": "vertical", "spacing": "md", "paddingAll": "20px", "contents": []map[string]any{
-		{"type": "text", "text": "ชะอุ่ม · CHAUM", "size": "xs", "color": "#28664F", "weight": "bold"},
+		{"type": "text", "text": "CHAUM RESOURCE MANAGEMENT", "size": "xs", "color": "#28664F", "weight": "bold"},
 		{"type": "text", "text": title, "size": "lg", "weight": "bold", "wrap": true, "color": "#24352D"},
 		{"type": "text", "text": detail, "size": "sm", "wrap": true, "color": "#59685F"},
 	}}}

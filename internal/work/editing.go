@@ -332,6 +332,9 @@ type InvoiceEditInput struct {
 }
 
 func (s *Service) UpdateInvoice(ctx context.Context, id string, in InvoiceEditInput) error {
+	return s.updateInvoice(ctx, id, in, false)
+}
+func (s *Service) updateInvoice(ctx context.Context, id string, in InvoiceEditInput, automatic bool) error {
 	if e := validID(id, "invoice_id"); e != nil {
 		return e
 	}
@@ -348,8 +351,15 @@ func (s *Service) UpdateInvoice(ctx context.Context, id string, in InvoiceEditIn
 		return invalid("previous_expected_amount", "กรุณาโหลดข้อมูลล่าสุด")
 	}
 	return s.Repo.Transaction(ctx, func(q Query) error {
-		var status, amount string
-		if e := q.QueryRow(ctx, `SELECT status::text,expected_amount::text FROM company_invoice WHERE invoice_id=$1 FOR UPDATE`, id).Scan(&status, &amount); e != nil {
+		var budgetTor string
+		if e := q.QueryRow(ctx, `SELECT tor_id::text FROM company_invoice WHERE invoice_id=$1`, id).Scan(&budgetTor); e != nil {
+			return e
+		}
+		if e := s.checkInvoiceBudget(ctx, q, budgetTor, id, expected); e != nil {
+			return e
+		}
+		var status, amount, tor, month string
+		if e := q.QueryRow(ctx, `SELECT status::text,expected_amount::text,tor_id::text,billing_month FROM company_invoice WHERE invoice_id=$1 FOR UPDATE`, id).Scan(&status, &amount, &tor, &month); e != nil {
 			return e
 		}
 		if status != "pending" {
@@ -359,7 +369,78 @@ func (s *Service) UpdateInvoice(ctx context.Context, id string, in InvoiceEditIn
 		if current != previous {
 			return conflict("ยอดถูกแก้แล้ว กรุณารีเฟรช")
 		}
+		if automatic {
+			if e := s.lockInvoicePayroll(ctx, q, tor, month); e != nil {
+				return e
+			}
+			preview, e := s.invoiceDeductions(ctx, q, tor, month)
+			if e != nil {
+				return e
+			}
+			if preview.Pending > 0 {
+				return conflict("ยังประมวลผลค่าจ้างของโครงการ/เดือนนี้ไม่ครบ")
+			}
+			deduction, e = Money(preview.Total)
+			if e != nil {
+				return e
+			}
+			if deduction > expected {
+				return invalid("expected_amount", "ยอดวางบิลน้อยกว่าเงินหักอัตโนมัติ")
+			}
+		}
 		_, e := q.Exec(ctx, `UPDATE company_invoice SET expected_amount=$2::numeric,exat_deduction_amount=$3::numeric,deduction_reason=$4 WHERE invoice_id=$1`, id, Decimal(expected), Decimal(deduction), in.Reason)
+		return e
+	})
+}
+
+// DeleteAssignment removes only a pristine TOR area. Location master data and
+// every area with staffing, surveys or financial history are preserved.
+func (s *Service) DeleteAssignment(ctx context.Context, p auth.Principal, id string) error {
+	if p.Role != auth.RoleSupervisor {
+		return invalid("role", "Supervisor เท่านั้น")
+	}
+	if e := validID(id, "assignment_id"); e != nil {
+		return e
+	}
+	return s.Repo.Transaction(ctx, func(q Query) error {
+		var tor, state string
+		if e := q.QueryRow(ctx, `SELECT tor_id::text FROM tor_location_assignment WHERE assignment_id=$1`, id).Scan(&tor); e != nil {
+			return e
+		}
+		if e := lock(ctx, q, "contract-edit:"+tor); e != nil {
+			return e
+		}
+		if e := q.QueryRow(ctx, `SELECT status::text FROM contract_tor WHERE tor_id=$1 FOR UPDATE`, tor).Scan(&state); e != nil {
+			return e
+		}
+		if state != "registered" && state != "active" {
+			return conflict("สัญญาสิ้นสุดหรือยกเลิกแล้ว")
+		}
+		var locked string
+		if e := q.QueryRow(ctx, `SELECT assignment_id::text FROM tor_location_assignment WHERE assignment_id=$1 FOR UPDATE`, id).Scan(&locked); e != nil {
+			return e
+		}
+		// Serialize with survey/funding/purchase writers before deciding whether
+		// cascading deletion is safe. New child inserts also wait on the area lock.
+		requests, e := q.Query(ctx, `SELECT requisition_id FROM equipment_requisition WHERE assignment_id=$1 ORDER BY requisition_id FOR UPDATE`, id)
+		if e != nil {
+			return e
+		}
+		for requests.Next() {
+		}
+		e = requests.Err()
+		requests.Close()
+		if e != nil {
+			return e
+		}
+		var used bool
+		if e := q.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM work_schedule WHERE assignment_id=$1) OR EXISTS(SELECT 1 FROM equipment_requisition WHERE assignment_id=$1 AND (requisition_type<>'tor_base' OR status<>'pending_survey')) OR EXISTS(SELECT 1 FROM requisition_item i JOIN equipment_requisition r USING(requisition_id) WHERE r.assignment_id=$1 AND (i.existing_qty<>0 OR i.actual_qty<>0)) OR EXISTS(SELECT 1 FROM expense_claim x JOIN equipment_requisition r USING(requisition_id) WHERE r.assignment_id=$1)`, id).Scan(&used); e != nil {
+			return e
+		}
+		if used {
+			return conflict("ลบไม่ได้: พื้นที่มีกะงาน การสำรวจ หรือรายการจัดซื้อแล้ว")
+		}
+		_, e = q.Exec(ctx, `DELETE FROM tor_location_assignment WHERE assignment_id=$1`, id)
 		return e
 	})
 }

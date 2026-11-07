@@ -31,6 +31,7 @@ type PayrollPreview struct {
 	Applied            string      `json:"total_deduction"`
 	Net                string      `json:"net_wage"`
 	Deductions         []Deduction `json:"deductions"`
+	PendingCheckouts   int         `json:"pending_checkouts"`
 	AttendanceComplete bool        `json:"attendance_complete"`
 }
 
@@ -61,9 +62,9 @@ func (s *Service) preview(ctx context.Context, q Query, in PayrollInput, locking
 	for rows.Next() {
 		var schedule, date, clock string
 		var id, status *string
-		var check *time.Time
+		var check, checkOut *time.Time
 		var leave bool
-		if e = rows.Scan(&schedule, &date, &clock, &id, &status, &check, &leave); e != nil {
+		if e = rows.Scan(&schedule, &date, &clock, &id, &status, &check, &checkOut, &leave); e != nil {
 			return out, e
 		}
 		start, e := Start(date, clock)
@@ -82,6 +83,11 @@ func (s *Service) preview(ctx context.Context, q Query, in PayrollInput, locking
 		}
 		switch *status {
 		case "on_time", "late":
+			if check == nil || checkOut == nil {
+				out.AttendanceComplete = false
+				out.PendingCheckouts++
+				continue
+			}
 			out.Workdays++
 		case "absent", "leave":
 		default:
@@ -173,6 +179,9 @@ func Month(v string) error {
 	return nil
 }
 func (s *Service) Invoice(ctx context.Context, in InvoiceInput) (string, error) {
+	return s.invoice(ctx, in, false)
+}
+func (s *Service) invoice(ctx context.Context, in InvoiceInput, automatic bool) (string, error) {
 	if e := validID(in.TorID, "tor_id"); e != nil {
 		return "", e
 	}
@@ -194,6 +203,28 @@ func (s *Service) Invoice(ctx context.Context, in InvoiceInput) (string, error) 
 	e = s.Repo.Transaction(ctx, func(q Query) error {
 		if e := lock(ctx, q, "invoice:"+in.TorID+":"+in.Month); e != nil {
 			return e
+		}
+		if e := s.checkInvoiceBudget(ctx, q, in.TorID, "", a); e != nil {
+			return e
+		}
+		if automatic {
+			if e := s.lockInvoicePayroll(ctx, q, in.TorID, in.Month); e != nil {
+				return e
+			}
+			preview, e := s.invoiceDeductions(ctx, q, in.TorID, in.Month)
+			if e != nil {
+				return e
+			}
+			if preview.Pending > 0 {
+				return conflict("ยังประมวลผลค่าจ้างของโครงการ/เดือนนี้ไม่ครบ กรุณาปิดงวดและประมวลผลก่อนสร้างใบวางบิล")
+			}
+			d, e = Money(preview.Total)
+			if e != nil {
+				return e
+			}
+			if d > a {
+				return invalid("expected_amount", "ยอดวางบิลน้อยกว่าเงินหักอัตโนมัติ")
+			}
 		}
 		var exists bool
 		if e := s.Repo.Row(ctx, q, query37, in.TorID, in.Month).Scan(&exists); e != nil {
@@ -248,6 +279,9 @@ func (s *Service) createPayroll(ctx context.Context, q Query, p auth.Principal, 
 	if e != nil {
 		return "", e
 	}
+	if out.PendingCheckouts > 0 {
+		return "", conflict("มีรายการขาดการเช็กเอาท์ กรุณาตรวจสอบและบันทึกการจบงานก่อนประมวลผลค่าจ้าง")
+	}
 	if !out.AttendanceComplete {
 		return "", conflict("finalize attendance before payroll")
 	}
@@ -289,7 +323,7 @@ func (s *Service) PayrollBatch(ctx context.Context, p auth.Principal, in Payroll
 	}
 	end, _ := Date(in.End)
 	if s.Now().Before(end.AddDate(0, 0, 1)) {
-		return nil, conflict("payroll period has not closed")
+		return nil, conflict("ยังไม่สิ้นงวดค่าจ้าง กรุณาประมวลผลหลังวันที่ " + end.In(Bangkok).Format("02/01/2006") + " สิ้นสุดแล้ว และตรวจการเช็กเอาท์ให้ครบ")
 	}
 	out := []PayrollBatchResult{}
 	err := s.Repo.Transaction(ctx, func(q Query) error {

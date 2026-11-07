@@ -60,6 +60,14 @@ func fixtureUsecases(t *testing.T) usecaseFixture {
 	if _, e = pool.Exec(ctx, `INSERT INTO equipment_requisition(requisition_no,requested_by,assignment_id,reason,requisition_type,status) VALUES($1,$2,$3,'fixture','tor_base','completed')`, uuid.NewString(), f.supervisor.UserID, f.assignment); e != nil {
 		t.Fatal(e)
 	}
+	t.Cleanup(func() {
+		// Payroll batches span all users; dispose this fixture's planned slots
+		// so deliberately unfinished work cannot contaminate later test cases.
+		_, err := pool.Exec(context.Background(), `UPDATE work_schedule SET shift_status='cancelled' WHERE worker_id IN ($1,$2)`, f.workerID, f.otherID)
+		if err != nil {
+			t.Error(err)
+		}
+	})
 	return f
 }
 func TestIntegrationEmergencyLeaveAndAtomicReplacement(t *testing.T) {
@@ -103,6 +111,9 @@ func TestIntegrationEmergencyLeaveAndAtomicReplacement(t *testing.T) {
 		t.Fatal("early check-in must be on_time", state, e)
 	}
 	*f.now = time.Date(2026, 10, 4, 18, 0, 0, 0, Bangkok)
+	if e = s.CheckOut(ctx, f.other, CheckOut{ids[0], "replacement work finished", f.other.UserID.String() + "/" + uuid.NewString()}); e != nil {
+		t.Fatal(e)
+	}
 	if _, e = s.Finalize(ctx); e != nil {
 		t.Fatal(e)
 	}

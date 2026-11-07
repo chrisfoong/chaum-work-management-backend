@@ -98,7 +98,7 @@ func TestIntegrationContractInvoiceAndPeopleEdits(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	change := InvoiceEditInput{Expected: "1100", Deduction: "100", PreviousExpected: "1000"}
+	change := InvoiceEditInput{Expected: "900", Deduction: "100", PreviousExpected: "1000"}
 	if err = s.UpdateInvoice(ctx, invoice, change); err != nil {
 		t.Fatal(err)
 	}
@@ -108,7 +108,7 @@ func TestIntegrationContractInvoiceAndPeopleEdits(t *testing.T) {
 	if err = s.Receive(ctx, invoice, "1000"); err != nil {
 		t.Fatal(err)
 	}
-	change.PreviousExpected = "1100"
+	change.PreviousExpected = "900"
 	if err = s.UpdateInvoice(ctx, invoice, change); err == nil {
 		t.Fatal("paid invoice overwritten")
 	}
@@ -180,6 +180,10 @@ func TestIntegrationPayrollRecordsConfirmerAndRejectsReplay(t *testing.T) {
 	}
 	lat, lon, accuracy := 13.75, 100.5, 10.0
 	if err = s.CheckIn(ctx, f.worker, CheckIn{ids[0], &lat, &lon, &accuracy, qr["qr_token"].(string)}); err != nil {
+		t.Fatal(err)
+	}
+	*f.now = time.Date(2026, 10, 1, 16, 0, 0, 0, Bangkok)
+	if err = s.CheckOut(ctx, f.worker, CheckOut{ids[0], "finished", f.worker.UserID.String() + "/" + uuid.NewString()}); err != nil {
 		t.Fatal(err)
 	}
 	*f.now = time.Date(2026, 10, 16, 8, 0, 0, 0, Bangkok)

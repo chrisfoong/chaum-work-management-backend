@@ -38,6 +38,9 @@ func registerCatalogRoutes(web, sup *gin.RouterGroup, s *Service) {
 		id, e := s.SaveAssignment(c.Request.Context(), p, c.Param("id"), "", in)
 		return map[string]any{"assignment_id": id}, e
 	}))
+	sup.DELETE("/assignments/:id", input(func(c *gin.Context, p auth.Principal, _ struct{}) (any, error) {
+		return nil, s.DeleteAssignment(c.Request.Context(), p, c.Param("id"))
+	}))
 	sup.GET("/assignments/:id/scope", func(c *gin.Context) {
 		out, e := s.AssignmentScope(c.Request.Context(), c.Param("id"))
 		respond(c, out, e)
